@@ -2,20 +2,37 @@
 
 ## 🎮 Game Concept
 
-Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics where up to 100 players simultaneously navigate their own procedurally generated dungeons. Players race against each other to complete objectives, collect items, and defeat enemies, with everyone starting on an equal footing in each match.
+Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics where up to 100 players navigate through procedurally generated dungeons and face off in periodic "gauntlet" battles. Players collect items, level up, and select boons during dungeon phases, then test their strength against other players in elimination rounds, with everyone starting on an equal footing in each match.
 
 ### Core Gameplay Loop
 
-1. Players join a lobby of up to 100 participants
-2. When the game starts, each player gets their own procedurally generated dungeon instance
-3. Players navigate their dungeons, collecting items, fighting enemies, and completing objectives
-4. Progress is tracked on a real-time leaderboard
-5. The first player to complete all objectives or the player with the most progress when time expires wins
+1. **Lobby Phase**
+   - Players join a lobby of up to 100 participants
+   - Wait for enough players to join
+
+2. **Dungeon Phase**
+   - Players navigate their individual procedurally generated dungeons
+   - Collect gear and items to boost stats
+   - Defeat enemies to gain XP
+   - Level up and select boons/abilities (attack speed, crit chance, etc.)
+   - Time-limited exploration (5-10 minutes)
+
+3. **Gauntlet Phase**
+   - Players are grouped into small "gauntlets" of 4-5 players
+   - Battle with all collected gear and abilities
+   - Last player standing in each gauntlet continues
+   - Eliminated players can spectate or join a new game
+
+4. **Repeat and Reduce**
+   - Return to dungeon phase with surviving players
+   - Next gauntlet features fewer, but more powerful players
+   - Continue until only one player remains
 
 ### Key Features
 
 - **Equal Starting Point**: All players begin with the same capabilities
 - **In-Session Progression**: Power increases only within a single run
+- **Periodic Player Battles**: Gauntlet phases that test player progression against others
 - **Global Events**: Special events that affect all players simultaneously
 - **Real-time Leaderboard**: Track how you compare to other players
 - **Roguelike Elements**: Procedurally generated dungeons and random item drops
@@ -51,23 +68,25 @@ dungeon-dash-royale/
 │   ├── vite.config.js
 │   ├── public/                # Static assets
 │   │   └── assets/
-│   │       ├── characters/    # Character sprites
-│   │       ├── tiles/         # Tileset images
-│   │       ├── ui/            # UI elements
-│   │       └── items/         # Item sprites
 │   └── src/
 │       ├── main.js            # Entry point
 │       ├── config.js          # Game configuration
 │       ├── scenes/            # Phaser scenes
 │       │   ├── LobbyScene.js  # Matchmaking lobby
 │       │   ├── GameScene.js   # Main gameplay
+│       │   ├── DungeonScene.js # Dungeon phase
+│       │   ├── GauntletScene.js # Combat phase
 │       │   └── ResultsScene.js # End of game
 │       ├── systems/           # Game systems
+│       │   ├── GameState.js   # Global game state
+│       │   ├── NetworkManager.js # Network communication
 │       │   ├── dungeon/       # Dungeon generation
 │       │   ├── combat/        # Combat mechanics
 │       │   ├── items/         # Item system
 │       │   └── ui/            # User interface
-│       └── utils/             # Utility functions
+│       ├── utils/             # Utility functions
+│       │   ├── controls.js    # Input handling
+│       │   └── debug.js       # Debug helpers
 ├── server/                    # Colyseus multiplayer server
 │   ├── package.json
 │   ├── index.js               # Server entry point
@@ -88,137 +107,87 @@ dungeon-dash-royale/
         └── random.js         # Seeded random generation
 ```
 
-## 🔄 Game Flow
+## 🔄 Current Progress
 
-### 1. Server Initialization
+### Completed Tasks
+- **Basic Multiplayer Framework**
+  - Server setup with Colyseus
+  - Client-server communication
+  - Player joining/leaving synchronization
+  - Real-time position updates
+  - Multiple player visibility
 
-- Server starts and creates room handlers
-- Rooms are available to join
-- Room monitor is available for debugging
+### Server Features Implemented
+- Room creation and management
+- Player state tracking
+- Countdown system for game start
+- Broadcasting of player movements
 
-### 2. Matchmaking & Lobby
+### Client Features Implemented
+- Lobby scene with connection UI
+- Game scene with player movement
+- Visual representation of other players
+- WASD and arrow key controls
+- Debug information display
 
-- Players connect to a lobby (up to 100 players)
-- Players can see others joining
-- When enough players join, a countdown begins
-- Players can mark themselves as "ready" to speed up the start
+## 🚀 Next Steps
 
-### 3. Game Start
+### Immediate Priorities
+1. **Implement Player Stats System**
+   - Create schema for player stats (health, attack, defense, etc.)
+   - Add inventory system for items
+   - Implement level and experience tracking
 
-- Server generates a unique dungeon for each player
-- Game state is initialized
-- Dungeons are sent to respective clients
-- Players receive their starting position and objectives
+2. **Phase Management**
+   - Add phase transition logic (Lobby → Dungeon → Gauntlet → Repeat)
+   - Create timers for phase duration
+   - Implement broadcasting of phase changes
 
-### 4. Gameplay Loop
+3. **Dungeon Generation**
+   - Create procedural dungeon generation algorithm
+   - Implement room types (combat, treasure, shop, boss)
+   - Add enemies with basic AI
 
-- Players navigate their dungeons
-- Server validates all player actions
-- Players collect items and complete objectives
-- Progress is synchronized and visible on the leaderboard
-- Global events occur periodically affecting all players
+4. **Item and Ability System**
+   - Create different item types (weapons, armor, consumables)
+   - Implement ability selection on level up
+   - Add effects of items and abilities on player stats
 
-### 5. Game End
+### Medium-Term Goals
+1. **Gauntlet Combat System**
+   - Implement player grouping for gauntlets
+   - Create combat mechanics
+   - Add victory/defeat conditions and handling
 
-- Time limit is reached OR a player completes all objectives
-- Final scores are calculated
-- Results are displayed to all players
-- Players return to lobby or can join a new game
+2. **Visual Improvements**
+   - Add proper character sprites
+   - Create dungeon tile sets
+   - Implement combat animations
+   - Add UI for player stats, inventory, and abilities
 
-## 🎲 Game Mechanics
+3. **Global Events**
+   - Implement event system
+   - Create various event types and effects
+   - Add visual notifications for events
 
-### Dungeon Generation
+### Long-Term Goals
+1. **Game Balancing**
+   - Tune item strength and rarity
+   - Balance abilities and progression
+   - Adjust combat mechanics for fair play
 
-- Procedurally generated using a consistent algorithm
-- Seeded generation ensures fairness across players
-- Multiple room types (combat, treasure, shop, boss)
-- Connected by corridors with potential hazards
-- Varying difficulty depending on depth
+2. **Matchmaking Improvements**
+   - Add skill-based matchmaking
+   - Implement lobby management for different game sizes
+   - Create spectator mode for eliminated players
 
-### Player Progression
-
-- Players collect items that enhance abilities
-- Abilities include combat moves, traversal options, and special actions
-- Power increases only during the active session
-- No persistent advantages between games
-
-### Combat System
-
-- Real-time action-based combat
-- Different enemy types with distinct behaviors
-- Strategic positioning and timing
-- Abilities and items change combat options
-
-### Item System
-
-- Random drops with varying rarity
-- Equipment affects player stats and abilities
-- Consumables for temporary effects
-- Special items for objective completion
-
-### Global Events
-
-- Periodic events affecting all players simultaneously
-- Can be positive (treasure rain) or negative (monster surge)
-- Creates dynamic gameplay moments and comeback opportunities
-
-## 📊 Multiplayer Architecture
-
-### State Synchronization
-
-- Server maintains authoritative game state
-- Client predicts movement for responsive feel
-- Server validates all important actions
-- Optimized state updates using Colyseus schema system
-
-### Room Management
-
-- Lobbies of up to 100 players
-- Game rooms created when match starts
-- Multiple concurrent games supported
-- Auto-disposal of empty rooms
-
-### Networking Optimization
-
-- Position updates only when necessary
-- Delta encoding for state changes
-- Interest management (only send relevant data to each player)
-- Handling latency with prediction and reconciliation
-
-## 🚀 Development Roadmap
-
-### Phase 1: Core Tech (Current)
-- Server-client architecture with Colyseus
-- Basic multiplayer functionality
-- Character movement and visibility
-- Lobby and room management
-
-### Phase 2: Core Gameplay
-- Procedural dungeon generation
-- Basic combat system
-- Item collection
-- Objective completion tracking
-
-### Phase 3: Game Systems
-- Complete item system
-- Enemy AI and behaviors
-- Global events
-- Leaderboard refinement
-
-### Phase 4: Polish
-- Visual effects and animations
-- Sound design
-- UI/UX improvements
-- Performance optimization
-
-### Phase 5: Launch
-- Matchmaking refinements
-- Server scaling
-- Analytics integration
-- Launch preparation
+3. **Deployment and Scaling**
+   - Set up server infrastructure
+   - Implement load balancing for high player counts
+   - Add analytics for gameplay monitoring
 
 ## 📝 Conclusion
 
-Dungeon Dash Royale combines the unpredictability and build diversity of roguelikes with the competitive thrill of battle royales, creating a unique experience where 100 players can compete in parallel dungeons. The tech stack (Phaser + Colyseus) provides a solid foundation for real-time multiplayer gameplay, and the modular architecture allows for scalable development.
+Dungeon Dash Royale combines the unpredictability and build diversity of roguelikes with the competitive thrill of battle royales, creating a unique experience where players compete through a mix of PvE and PvP gameplay. The current implementation has established the core multiplayer foundation, allowing us to focus next on the dungeon exploration and combat mechanics that will make the game truly engaging.
 
-The key innovation is maintaining competitive fairness while incorporating roguelike progression, solving this through session-based power increases without persistent advantages between games.
+The key innovation is the alternating phases of individual progression and competitive elimination, creating dynamic gameplay where strategy and skill are equally important. With the basic multiplayer infrastructure now in place, we can begin implementing these core gameplay mechanics.

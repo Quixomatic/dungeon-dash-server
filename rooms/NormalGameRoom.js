@@ -9,7 +9,7 @@ class PlayerState extends Schema {
     this.id = "";
     this.name = "";
     this.ready = false;
-    this.position = { x: 0, y: 0 };
+    this.position = new Position();
     this.health = 100;
     this.maxHealth = 100;
     this.level = 1;
@@ -19,6 +19,15 @@ class PlayerState extends Schema {
     this.isAlive = true;
     this.completedObjectives = new ArraySchema();
     this.joinTime = Date.now();
+  }
+}
+
+// Define position schema
+class Position extends Schema {
+  constructor() {
+    super();
+    this.x = 0;
+    this.y = 0;
   }
 }
 
@@ -67,7 +76,7 @@ type(PlayerState, {
   id: "string",
   name: "string",
   ready: "boolean",
-  position: { x: "number", y: "number" },
+  position: Position,
   health: "number",
   maxHealth: "number",
   level: "number",
@@ -77,6 +86,12 @@ type(PlayerState, {
   isAlive: "boolean",
   completedObjectives: ["string"],
   joinTime: "number"
+});
+
+// Define schemas for types
+type(Position, {
+  x: "number",
+  y: "number"
 });
 
 type(Item, {
@@ -232,6 +247,13 @@ export class NormalGameRoom extends Room {
         // Update player position
         player.position.x = message.x;
         player.position.y = message.y;
+        
+        // For debugging, broadcast player movement to all clients
+        this.broadcast("playerMoved", {
+          id: client.id,
+          x: message.x,
+          y: message.y
+        });
       } 
       // These are for the full game, included for completeness
       else if (message.type === "useAbility" && this.state.gameStarted) {
@@ -445,11 +467,14 @@ export class NormalGameRoom extends Room {
     const sortedPlayers = Object.entries(this.state.players)
       .sort(([, a], [, b]) => {
         // Primary sort by objectives completed
-        const objDiff = b.completedObjectives.length - a.completedObjectives.length;
+        const aObjectives = a.completedObjectives ? a.completedObjectives.length : 0;
+        const bObjectives = b.completedObjectives ? b.completedObjectives.length : 0;
+        const objDiff = bObjectives - aObjectives;
+        
         if (objDiff !== 0) return objDiff;
         
         // Secondary sort by progress
-        return b.currentProgress - a.currentProgress;
+        return (b.currentProgress || 0) - (a.currentProgress || 0);
       })
       .map(([id]) => id);
     
@@ -458,13 +483,26 @@ export class NormalGameRoom extends Room {
     
     // Broadcast leaderboard update
     this.broadcast("leaderboardUpdate", {
-      leaderboard: sortedPlayers.map((id, index) => ({
-        id: id,
-        name: this.state.players[id]?.name || "Unknown",
-        rank: index + 1,
-        progress: this.state.players[id]?.currentProgress || 0,
-        completedObjectives: this.state.players[id]?.completedObjectives || []
-      }))
+      leaderboard: sortedPlayers.map((id, index) => {
+        const player = this.state.players[id];
+        if (!player) {
+          return {
+            id: id,
+            name: "Unknown",
+            rank: index + 1,
+            progress: 0,
+            completedObjectives: []
+          };
+        }
+        
+        return {
+          id: id,
+          name: player.name || "Unknown",
+          rank: index + 1,
+          progress: player.currentProgress || 0,
+          completedObjectives: player.completedObjectives || []
+        };
+      })
     });
   }
 
@@ -571,10 +609,13 @@ export class NormalGameRoom extends Room {
     if (!player) return;
     
     // Add objective to completed objectives
+    if (!player.completedObjectives) {
+      player.completedObjectives = new ArraySchema();
+    }
     player.completedObjectives.push(objectiveId);
     
     // Increase progress significantly
-    player.currentProgress += 20;
+    player.currentProgress = (player.currentProgress || 0) + 20;
     
     // Broadcast objective completion
     this.broadcast("objectiveCompleted", {
@@ -587,7 +628,7 @@ export class NormalGameRoom extends Room {
     this.updateLeaderboard();
     
     // Check if player has completed all objectives
-    if (player.completedObjectives.length >= 2) { // Assuming 2 objectives for now
+    if (player.completedObjectives && player.completedObjectives.length >= 2) { // Assuming 2 objectives for now
       this.handlePlayerVictory(client);
     }
   }
