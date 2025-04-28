@@ -1,132 +1,29 @@
 // server/rooms/NormalGameRoom.js
 import { Room } from "colyseus";
-import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { GameRoomState } from "../schemas/GameRoomState.js";
+import { PlayerState } from "../schemas/PlayerState.js";
+import { Position } from "../schemas/Position.js";
+import { Item } from "../schemas/Item.js";
 
-// Define the player state schema
-class PlayerState extends Schema {
-  constructor() {
-    super();
-    this.id = "";
-    this.name = "";
-    this.ready = false;
-    this.position = new Position();
-    this.health = 100;
-    this.maxHealth = 100;
-    this.level = 1;
-    this.items = new ArraySchema();
-    this.abilities = new ArraySchema();
-    this.currentProgress = 0;
-    this.isAlive = true;
-    this.completedObjectives = new ArraySchema();
-    this.joinTime = Date.now();
-  }
-}
-
-// Define position schema
-class Position extends Schema {
-  constructor() {
-    super();
-    this.x = 0;
-    this.y = 0;
-  }
-}
-
-// Define the item schema
-class Item extends Schema {
-  constructor() {
-    super();
-    this.id = "";
-    this.name = "";
-    this.type = "";
-    this.rarity = "";
-    this.stats = {};
-  }
-}
-
-// Define the ability schema
-class Ability extends Schema {
-  constructor() {
-    super();
-    this.id = "";
-    this.name = "";
-    this.cooldown = 0;
-    this.effect = "";
-  }
-}
-
-// Define the room state schema
-class GameRoomState extends Schema {
-  constructor() {
-    super();
-    // Map of all players by client ID
-    this.players = new MapSchema();
-    // Game state
-    this.gameStarted = false;
-    this.gameEnded = false;
-    this.timeRemaining = 0;
-    this.countdown = 0;
-    this.winner = null;
-    this.leaderboard = new ArraySchema();
-    this.globalEvents = new ArraySchema();
-  }
-}
-
-// Define schemas for types
-type(PlayerState, {
-  id: "string",
-  name: "string",
-  ready: "boolean",
-  position: Position,
-  health: "number",
-  maxHealth: "number",
-  level: "number",
-  items: [Item],
-  abilities: [Ability],
-  currentProgress: "number",
-  isAlive: "boolean",
-  completedObjectives: ["string"],
-  joinTime: "number"
-});
-
-// Define schemas for types
-type(Position, {
-  x: "number",
-  y: "number"
-});
-
-type(Item, {
-  id: "string",
-  name: "string",
-  type: "string",
-  rarity: "string",
-  stats: "object"
-});
-
-type(Ability, {
-  id: "string",
-  name: "string",
-  cooldown: "number",
-  effect: "string"
-});
-
-type(GameRoomState, {
-  players: { map: PlayerState },
-  gameStarted: "boolean",
-  gameEnded: "boolean",
-  timeRemaining: "number",
-  countdown: "number",
-  winner: "string",
-  leaderboard: ["string"],
-  globalEvents: ["string"]
-});
-
-// Main room handler
 export class NormalGameRoom extends Room {
   constructor() {
     super();
     this.maxClients = 100;
     this.autoDispose = true;
-    this.patchRate = 50; // Send state updates 20 times per second
+    
+    // Set 60 ticks per second (16.67ms)
+    this.fixedTimeStep = 16.67; // ms
+    
+    // Set patch rate to match tick rate for smooth updates
+    this.patchRate = 16.67; // Send state updates 60 times per second
+    
+    // Game phases
+    this.PHASES = {
+      LOBBY: "lobby",
+      DUNGEON: "dungeon",
+      GAUNTLET: "gauntlet",
+      RESULTS: "results"
+    };
     
     // Game configuration
     this.waitingForPlayersTimeout = null;
@@ -134,6 +31,8 @@ export class NormalGameRoom extends Room {
     this.gameDuration = 10 * 60 * 1000; // 10 minutes
     this.minPlayersToStart = 2;
     this.countdownDuration = 10; // seconds
+    this.dungeonPhaseDuration = 5 * 60 * 1000; // 5 minutes
+    this.gauntletPhaseDuration = 2 * 60 * 1000; // 2 minutes
   }
 
   onCreate(options) {
@@ -141,9 +40,13 @@ export class NormalGameRoom extends Room {
     
     // Initialize room state
     this.setState(new GameRoomState());
+    this.state.phase = this.PHASES.LOBBY;
     
     // Register message handlers
     this.registerMessageHandlers();
+    
+    // Set up fixed simulation interval
+    this.setSimulationInterval((deltaTime) => this.update(deltaTime), this.fixedTimeStep);
     
     // Start waiting for players
     this.waitForPlayers();
@@ -158,8 +61,16 @@ export class NormalGameRoom extends Room {
     player.name = options.name || `Player_${client.id.substr(0, 6)}`;
     player.joinTime = Date.now();
     
+    // Set random starting position
+    player.position.x = 400 + (Math.random() * 100 - 50);
+    player.position.y = 300 + (Math.random() * 100 - 50);
+    
     // Add player to room state
     this.state.players[client.id] = player;
+    
+    // Log the current player count
+    console.log(`Player added to room state. Current players: ${Object.keys(this.state.players).length}`);
+    console.log("Player IDs:", Object.keys(this.state.players));
     
     // If we've reached minPlayersToStart, start countdown if not already started
     if (Object.keys(this.state.players).length >= this.minPlayersToStart) {
@@ -177,6 +88,7 @@ export class NormalGameRoom extends Room {
     this.broadcast("playerJoined", {
       id: client.id,
       name: player.name,
+      position: { x: player.position.x, y: player.position.y },
       playerCount: Object.keys(this.state.players).length
     }, { except: client });
   }
@@ -217,6 +129,46 @@ export class NormalGameRoom extends Room {
     
     console.log(`Room ${this.roomId} disposed.`);
   }
+  
+  // Fixed timestep update - runs at 60 ticks per second
+  update(deltaTime) {
+    // Process player inputs and update positions
+    this.processPlayerInputs(deltaTime);
+    
+    // Update game systems
+    if (this.state.gameStarted && !this.state.gameEnded) {
+      this.updateGameSystems(deltaTime);
+    }
+  }
+  
+  // Process all player inputs for this tick
+  processPlayerInputs(deltaTime) {
+    for (const id in this.state.players) {
+      const player = this.state.players[id];
+      
+      // Process player inputs
+      const moved = player.processInputs(deltaTime);
+      
+      // If debugging, log major position changes
+      if (moved && deltaTime > 30) {
+        console.log(`Player ${id} moved during large delta: ${deltaTime}ms`);
+      }
+    }
+  }
+  
+  // Update game systems (AI, physics, etc.)
+  updateGameSystems(deltaTime) {
+    // Update phase timers
+    if (this.state.phaseEndTime > 0) {
+      const timeRemaining = this.state.phaseEndTime - Date.now();
+      if (timeRemaining <= 0) {
+        // Phase has ended - handled by existing timeouts
+      }
+    }
+    
+    // Update any other game systems that need fixed-step updates
+    // Examples: enemy AI, physics, collisions, etc.
+  }
 
   // Register all message handlers
   registerMessageHandlers() {
@@ -237,23 +189,46 @@ export class NormalGameRoom extends Room {
       }
     });
     
-    // Player movement/action
+    // Player input - replace the movement handler with an input handler
+    this.onMessage("playerInput", (client, inputData) => {
+      const player = this.state.players[client.id];
+      if (!player) return;
+      
+      // Rate limit input messages (prevent flooding)
+      const now = Date.now();
+      if (now - player.lastMoveTime < 16) { // Limit to ~60 updates per second
+        return;
+      }
+      player.lastMoveTime = now;
+      
+      // Add input to player's input queue
+      player.addInput(inputData);
+    });
+    
+    // Legacy handler for compatibility - can be removed later
     this.onMessage("playerAction", (client, message) => {
       const player = this.state.players[client.id];
       if (!player) return;
       
       // For our tech demo, allow movement even if game hasn't started
       if (message.type === "move") {
-        // Update player position
+        // Rate limit movement messages (prevent flooding)
+        const now = Date.now();
+        if (now - player.lastMoveTime < 16) { // Limit to ~60 updates per second
+          return;
+        }
+        player.lastMoveTime = now;
+        
+        // Update player position directly (old method)
         player.position.x = message.x;
         player.position.y = message.y;
         
-        // For debugging, broadcast player movement to all clients
+        // Broadcast movement to all other clients for immediate feedback
         this.broadcast("playerMoved", {
           id: client.id,
           x: message.x,
           y: message.y
-        });
+        }, { except: client });
       } 
       // These are for the full game, included for completeness
       else if (message.type === "useAbility" && this.state.gameStarted) {
@@ -357,14 +332,8 @@ export class NormalGameRoom extends Room {
     this.state.gameEnded = false;
     this.state.timeRemaining = this.gameDuration;
     
-    // Generate dungeons and assign to players
-    this.generateDungeons();
-    
-    // Broadcast game started
-    this.broadcast("gameStarted", {
-      players: Object.keys(this.state.players).length,
-      duration: this.gameDuration
-    });
+    // Start first dungeon phase
+    this.startDungeonPhase();
     
     // Set game end timeout
     this.clock.setTimeout(() => {
@@ -387,12 +356,199 @@ export class NormalGameRoom extends Room {
     }, 1000);
   }
 
+  startDungeonPhase() {
+    console.log(`Starting dungeon phase in room ${this.roomId}`);
+    
+    // Set phase
+    this.state.phase = this.PHASES.DUNGEON;
+    this.state.phaseEndTime = Date.now() + this.dungeonPhaseDuration;
+    
+    // Generate dungeons for each player
+    this.generateDungeons();
+    
+    // Broadcast phase change
+    this.broadcast("phaseChange", {
+      phase: this.state.phase,
+      duration: this.dungeonPhaseDuration,
+      endTime: this.state.phaseEndTime
+    });
+    
+    // Schedule gauntlet phase
+    this.clock.setTimeout(() => {
+      this.startGauntletPhase();
+    }, this.dungeonPhaseDuration);
+  }
+
+  startGauntletPhase() {
+    console.log(`Starting gauntlet phase in room ${this.roomId}`);
+    
+    // Set phase
+    this.state.phase = this.PHASES.GAUNTLET;
+    this.state.phaseEndTime = Date.now() + this.gauntletPhaseDuration;
+    
+    // Create gauntlet groups
+    const gauntlets = this.createGauntlets();
+    
+    // Broadcast phase change
+    this.broadcast("phaseChange", {
+      phase: this.state.phase,
+      duration: this.gauntletPhaseDuration,
+      endTime: this.state.phaseEndTime,
+      gauntletsCount: gauntlets.length
+    });
+    
+    // Schedule next phase
+    this.clock.setTimeout(() => {
+      this.resolveGauntlets();
+      
+      // If only one player remains, end the game
+      const alivePlayers = Object.values(this.state.players)
+        .filter(player => player.isAlive);
+      
+      if (alivePlayers.length <= 1) {
+        this.endGame(alivePlayers.length === 1 ? "winner" : "timeUp");
+      } else {
+        this.startDungeonPhase();
+      }
+    }, this.gauntletPhaseDuration);
+  }
+
+  // Remaining methods are the same as before...
+  // (createGauntlets, resolveGauntlets, endGame, generateDungeons, etc.)
+  
+  // Include all the other methods from the previous NormalGameRoom implementation
+  // (generateDungeonLayout, updateLeaderboard, triggerGlobalEvent, getEventMessage,
+  // shuffleArray, handleAbilityUse, handleItemCollection, handleObjectiveCompletion,
+  // handlePlayerVictory)
+  
+  createGauntlets() {
+    const alivePlayers = Object.entries(this.state.players)
+      .filter(([_, player]) => player.isAlive)
+      .map(([id, _]) => id);
+    
+    // Shuffle players for random grouping
+    this.shuffleArray(alivePlayers);
+    
+    // Group into gauntlets of 4-5 players
+    const gauntlets = [];
+    const gauntletSize = alivePlayers.length <= 10 ? 2 : 
+                        alivePlayers.length <= 20 ? 3 : 
+                        alivePlayers.length <= 50 ? 4 : 5;
+    
+    for (let i = 0; i < alivePlayers.length; i += gauntletSize) {
+      const gauntlet = alivePlayers.slice(i, i + gauntletSize);
+      if (gauntlet.length >= 2) { // Need at least 2 players for a gauntlet
+        gauntlets.push(gauntlet);
+      } else if (gauntlets.length > 0) {
+        // Add remaining players to the last gauntlet
+        gauntlets[gauntlets.length - 1].push(...gauntlet);
+      }
+    }
+    
+    // Broadcast gauntlet assignments
+    gauntlets.forEach((gauntlet, index) => {
+      const gauntletId = `gauntlet_${index}`;
+      
+      // Inform players of their gauntlet assignments
+      gauntlet.forEach(playerId => {
+        // Make sure player exists
+        if (this.state.players[playerId]) {
+          // Assign gauntlet ID to player
+          this.state.players[playerId].gauntletId = gauntletId;
+          
+          // Send message to player
+          const client = this.clients.find(c => c.id === playerId);
+          if (client) {
+            client.send("gauntletAssigned", {
+              gauntletId,
+              players: gauntlet.map(id => ({
+                id,
+                name: this.state.players[id].name,
+                level: this.state.players[id].level
+              }))
+            });
+          }
+        }
+      });
+    });
+    
+    return gauntlets;
+  }
+
+  resolveGauntlets() {
+    // Get all gauntlets by looking at player.gauntletId
+    const gauntlets = new Map();
+    
+    for (const playerId in this.state.players) {
+      const player = this.state.players[playerId];
+      if (player.gauntletId && player.isAlive) {
+        if (!gauntlets.has(player.gauntletId)) {
+          gauntlets.set(player.gauntletId, []);
+        }
+        gauntlets.get(player.gauntletId).push(playerId);
+      }
+    }
+    
+    // For each gauntlet, determine a winner randomly
+    // (in the full game this would be based on actual combat)
+    for (const [gauntletId, players] of gauntlets.entries()) {
+      if (players.length > 1) {
+        // Pick random winner
+        const winnerIndex = Math.floor(Math.random() * players.length);
+        const winnerId = players[winnerIndex];
+        
+        // Mark other players as eliminated
+        players.forEach(playerId => {
+          if (playerId !== winnerId) {
+            this.state.players[playerId].isAlive = false;
+            
+            // Notify player of elimination
+            const client = this.clients.find(c => c.id === playerId);
+            if (client) {
+              client.send("eliminated", {
+                gauntletId,
+                winnerId,
+                winnerName: this.state.players[winnerId].name
+              });
+            }
+          }
+        });
+        
+        // Notify winner
+        const winnerClient = this.clients.find(c => c.id === winnerId);
+        if (winnerClient) {
+          winnerClient.send("gauntletVictory", {
+            gauntletId,
+            eliminatedPlayers: players.filter(id => id !== winnerId).map(id => ({
+              id,
+              name: this.state.players[id].name
+            }))
+          });
+        }
+        
+        // Broadcast gauntlet result
+        this.broadcast("gauntletResult", {
+          gauntletId,
+          winnerId,
+          winnerName: this.state.players[winnerId].name,
+          players: players.length
+        });
+      }
+    }
+    
+    // Clear gauntlet assignments
+    for (const playerId in this.state.players) {
+      this.state.players[playerId].gauntletId = null;
+    }
+  }
+
   endGame(reason = "normal") {
     console.log(`Ending game in room ${this.roomId}. Reason: ${reason}`);
     
     // Set game state
     this.state.gameStarted = false;
     this.state.gameEnded = true;
+    this.state.phase = this.PHASES.RESULTS;
     
     // Determine winner
     this.updateLeaderboard();
@@ -405,12 +561,24 @@ export class NormalGameRoom extends Room {
         id: this.state.winner,
         name: this.state.players[this.state.winner]?.name || "Unknown"
       } : null,
-      leaderboard: this.state.leaderboard.map(id => ({
-        id: id,
-        name: this.state.players[id]?.name || "Unknown",
-        progress: this.state.players[id]?.currentProgress || 0,
-        completedObjectives: this.state.players[id]?.completedObjectives || []
-      }))
+      leaderboard: this.state.leaderboard.map(id => {
+        const player = this.state.players[id];
+        if (!player) {
+          return {
+            id: id,
+            name: "Unknown",
+            progress: 0,
+            completedObjectives: []
+          };
+        }
+        
+        return {
+          id: id,
+          name: player.name || "Unknown",
+          progress: player.currentProgress || 0,
+          completedObjectives: player.completedObjectives || []
+        };
+      })
     });
     
     // Lock the room to prevent new players from joining
@@ -549,6 +717,15 @@ export class NormalGameRoom extends Room {
     };
     
     return messages[eventType] || "A mysterious event is occurring!";
+  }
+
+  // Helper methods
+  shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
   }
 
   // Player action handlers
