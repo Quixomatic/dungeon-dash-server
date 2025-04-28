@@ -33,67 +33,6 @@ export class PlayerState extends Schema {
       down: false
     };
   }
-  
-  // Method to add input to the queue
-  addInput(input) {
-    this._inputQueue.push({
-      ...input,
-      timestamp: Date.now()
-    });
-  }
-  
-  // Method to clear the input queue
-  clearInputQueue() {
-    this._inputQueue = [];
-  }
-  
-  // Method to process inputs
-  processInputs(deltaTime) {
-    if (this._inputQueue.length === 0) return false;
-    
-    let moved = false;
-    const speedPerMs = this.moveSpeed / 1000; // Convert units/second to units/ms
-    
-    // Process all inputs in the queue
-    this._inputQueue.forEach(input => {
-      // Apply movement based on input
-      if (input.left) {
-        this.position.x -= speedPerMs * deltaTime;
-        moved = true;
-      } else if (input.right) {
-        this.position.x += speedPerMs * deltaTime;
-        moved = true;
-      }
-      
-      if (input.up) {
-        this.position.y -= speedPerMs * deltaTime;
-        moved = true;
-      } else if (input.down) {
-        this.position.y += speedPerMs * deltaTime;
-        moved = true;
-      }
-    });
-    
-    // Apply boundary constraints
-    this.position.x = Math.max(0, Math.min(this.position.x, 800));
-    this.position.y = Math.max(0, Math.min(this.position.y, 600));
-    
-    // Store the most recent input as current
-    if (this._inputQueue.length > 0) {
-      const latestInput = this._inputQueue[this._inputQueue.length - 1];
-      this._currentInput = {
-        left: latestInput.left,
-        right: latestInput.right,
-        up: latestInput.up,
-        down: latestInput.down
-      };
-    }
-    
-    // Clear the queue after processing
-    this.clearInputQueue();
-    
-    return moved;
-  }
 }
 
 type(PlayerState, {
@@ -112,5 +51,7 @@ type(PlayerState, {
   joinTime: "number",
   lastMoveTime: "number",
   moveSpeed: "number",
-  gauntletId: "string"
+  gauntletId: "string",
+  _inputQueue: "array",
+  _currentInput: "object"
 });

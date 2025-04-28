@@ -1,4 +1,4 @@
-# Dungeon Dash Royale: Project Blueprint
+# Dungeon Dash Royale: Project Documentation
 
 ## 🎮 Game Concept
 
@@ -28,15 +28,6 @@ Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics w
    - Next gauntlet features fewer, but more powerful players
    - Continue until only one player remains
 
-### Key Features
-
-- **Equal Starting Point**: All players begin with the same capabilities
-- **In-Session Progression**: Power increases only within a single run
-- **Periodic Player Battles**: Gauntlet phases that test player progression against others
-- **Global Events**: Special events that affect all players simultaneously
-- **Real-time Leaderboard**: Track how you compare to other players
-- **Roguelike Elements**: Procedurally generated dungeons and random item drops
-
 ## 🛠️ Technical Stack
 
 ### Server-Side
@@ -62,132 +53,152 @@ Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics w
 
 ```
 dungeon-dash-royale/
-├── client/                     # Phaser game client
+├── client/                      # Phaser game client
 │   ├── package.json
 │   ├── index.html
 │   ├── vite.config.js
-│   ├── public/                # Static assets
+│   ├── public/                 # Static assets
 │   │   └── assets/
 │   └── src/
-│       ├── main.js            # Entry point
-│       ├── config.js          # Game configuration
-│       ├── scenes/            # Phaser scenes
-│       │   ├── LobbyScene.js  # Matchmaking lobby
-│       │   ├── GameScene.js   # Main gameplay
-│       │   ├── DungeonScene.js # Dungeon phase
-│       │   ├── GauntletScene.js # Combat phase
+│       ├── main.js             # Entry point
+│       ├── managers/           # Game component managers
+│       │   ├── PlayerManager.js   # Handles player creation and updates
+│       │   ├── NetworkHandler.js  # Handles network communication
+│       │   ├── InputHandler.js    # Handles player input
+│       │   ├── UIManager.js       # Manages UI elements
+│       │   └── DebugManager.js    # Debug visualization
+│       ├── scenes/             # Phaser scenes
+│       │   ├── LobbyScene.js   # Matchmaking lobby
+│       │   ├── GameScene.js    # Main gameplay
 │       │   └── ResultsScene.js # End of game
-│       ├── systems/           # Game systems
-│       │   ├── GameState.js   # Global game state
-│       │   ├── NetworkManager.js # Network communication
-│       │   ├── dungeon/       # Dungeon generation
-│       │   ├── combat/        # Combat mechanics
-│       │   ├── items/         # Item system
-│       │   └── ui/            # User interface
-│       ├── utils/             # Utility functions
-│       │   ├── controls.js    # Input handling
-│       │   └── debug.js       # Debug helpers
-├── server/                    # Colyseus multiplayer server
+│       ├── systems/            # Game systems
+│       │   ├── GameState.js    # Global game state
+│       │   └── NetworkManager.js # Network communication
+│       └── utils/              # Utility functions
+│           ├── controls.js     # Input handling
+│           └── debug.js        # Debug helpers
+├── server/                     # Colyseus multiplayer server
 │   ├── package.json
-│   ├── index.js               # Server entry point
-│   ├── rooms/                 # Game room definitions
-│   │   ├── NormalGameRoom.js  # Standard game mode
-│   │   └── CustomGameRoom.js  # For private matches
-│   ├── schemas/               # Colyseus state schemas
+│   ├── index.js                # Server entry point
+│   ├── rooms/                  # Game room definitions
+│   │   ├── BaseRoom.js         # Base room class
+│   │   └── NormalGameRoom.js   # Standard game mode
+│   ├── schemas/                # Colyseus state schemas
 │   │   ├── PlayerState.js
-│   │   ├── RoomState.js
-│   │   └── items/            # Item schemas
-│   └── systems/               # Server-side game logic
-│       ├── dungeon/          # Dungeon generation
-│       ├── events/           # Global event system
-│       └── leaderboard/      # Ranking system
-└── shared/                   # Shared code between client and server
-    ├── constants.js          # Game constants
-    └── utils/                # Shared utility functions
-        └── random.js         # Seeded random generation
+│   │   ├── GameRoomState.js
+│   │   ├── Position.js
+│   │   ├── Item.js
+│   │   └── Ability.js
+│   └── systems/                # Server-side game logic
+│       ├── InputHandler.js     # Processes player inputs
+│       ├── PhaseManager.js     # Manages game phases
+│       ├── EventManager.js     # Handles global events
+│       ├── CollisionSystem.js  # Collision detection
+│       ├── LeaderboardSystem.js # Player rankings
+│       └── DungeonGenerator.js # Generates dungeons
 ```
 
 ## 🔄 Current Progress
 
-### Completed Tasks
-- **Basic Multiplayer Framework**
-  - Server setup with Colyseus
-  - Client-server communication
-  - Player joining/leaving synchronization
-  - Real-time position updates
-  - Multiple player visibility
+### Architecture Implementation
+- [x] Modularized server code
+- [x] Modularized client code
+- [x] 60Hz fixed tick rate system
+- [x] Client-side prediction with server reconciliation
+- [x] Smooth interpolation for other players
 
-### Server Features Implemented
-- Room creation and management
-- Player state tracking
-- Countdown system for game start
-- Broadcasting of player movements
+### Server Features
+- [x] Room creation and management
+- [x] Player state tracking
+- [x] Game phase management
+- [x] Countdown system for game start
+- [x] Event system
+- [x] Input handling and validation
+- [x] Leaderboard system
 
-### Client Features Implemented
-- Lobby scene with connection UI
-- Game scene with player movement
-- Visual representation of other players
-- WASD and arrow key controls
-- Debug information display
+### Client Features
+- [x] Lobby scene with connection UI
+- [x] Game scene with player movement
+- [x] Visual representation of other players
+- [x] WASD and arrow key controls
+- [x] Debug information display
+- [x] Responsive local player controls
+- [x] Smooth remote player movement
 
 ## 🚀 Next Steps
 
 ### Immediate Priorities
-1. **Implement Player Stats System**
-   - Create schema for player stats (health, attack, defense, etc.)
-   - Add inventory system for items
-   - Implement level and experience tracking
+1. **Implement Dungeon Generation**
+   - Create procedural dungeon generator
+   - Implement room types and corridors
+   - Add obstacles and collectibles
 
-2. **Phase Management**
-   - Add phase transition logic (Lobby → Dungeon → Gauntlet → Repeat)
-   - Create timers for phase duration
-   - Implement broadcasting of phase changes
+2. **Create Item and Ability System**
+   - Define item types and effects
+   - Implement player inventory
+   - Create ability activation logic
 
-3. **Dungeon Generation**
-   - Create procedural dungeon generation algorithm
-   - Implement room types (combat, treasure, shop, boss)
-   - Add enemies with basic AI
-
-4. **Item and Ability System**
-   - Create different item types (weapons, armor, consumables)
-   - Implement ability selection on level up
-   - Add effects of items and abilities on player stats
+3. **Build Combat System**
+   - Implement attack mechanics
+   - Create health and damage calculations
+   - Add visual effects for combat
 
 ### Medium-Term Goals
-1. **Gauntlet Combat System**
-   - Implement player grouping for gauntlets
-   - Create combat mechanics
-   - Add victory/defeat conditions and handling
+1. **Add Progression Systems**
+   - Create level-up mechanics
+   - Implement XP rewards
+   - Add skill tree for abilities
 
-2. **Visual Improvements**
-   - Add proper character sprites
-   - Create dungeon tile sets
-   - Implement combat animations
-   - Add UI for player stats, inventory, and abilities
+2. **Enhance Visuals**
+   - Create proper character sprites
+   - Add dungeon tile sets
+   - Implement animations for actions
 
-3. **Global Events**
-   - Implement event system
-   - Create various event types and effects
-   - Add visual notifications for events
+3. **Improve Game Flow**
+   - Polish phase transitions
+   - Add countdown timers
+   - Create spectator mode
 
-### Long-Term Goals
-1. **Game Balancing**
-   - Tune item strength and rarity
-   - Balance abilities and progression
-   - Adjust combat mechanics for fair play
+## 💻 Development Notes
 
-2. **Matchmaking Improvements**
-   - Add skill-based matchmaking
-   - Implement lobby management for different game sizes
-   - Create spectator mode for eliminated players
+### Fixed Tick Rate System
+- Server runs at 60Hz (16.67ms)
+- Client uses fixed timestep for movement
+- Input sequencing for reconciliation
+- Interpolation for smooth visuals
 
-3. **Deployment and Scaling**
-   - Set up server infrastructure
-   - Implement load balancing for high player counts
-   - Add analytics for gameplay monitoring
+### Client Prediction
+1. Client processes input locally immediately
+2. Input is sent to server with sequence number
+3. Server validates and processes input
+4. Server sends acknowledgement with position
+5. Client reconciles if prediction was incorrect
 
-## 📝 Conclusion
+### Interpolation System
+- Other players' positions are interpolated
+- Linear interpolation factor: 0.3 (adjustable)
+- Updates at client frame rate (60+ FPS)
 
-Dungeon Dash Royale combines the unpredictability and build diversity of roguelikes with the competitive thrill of battle royales, creating a unique experience where players compete through a mix of PvE and PvP gameplay. The current implementation has established the core multiplayer foundation, allowing us to focus next on the dungeon exploration and combat mechanics that will make the game truly engaging.
+## 🔧 Developer Setup
 
-The key innovation is the alternating phases of individual progression and competitive elimination, creating dynamic gameplay where strategy and skill are equally important. With the basic multiplayer infrastructure now in place, we can begin implementing these core gameplay mechanics.
+1. Clone the repository
+2. Install dependencies:
+   ```
+   cd server && npm install
+   cd ../client && npm install
+   ```
+3. Start the server:
+   ```
+   cd server && npm run dev
+   ```
+4. Start the client:
+   ```
+   cd client && npm run dev
+   ```
+5. Open browser to `http://localhost:5173`
+
+## 📚 Key Resources
+
+- [Colyseus Documentation](https://docs.colyseus.io/)
+- [Phaser 3 Documentation](https://newdocs.phaser.io/docs/3.60.0)
+- [Client-Side Prediction Guide](https://www.gabrielgambetta.com/client-side-prediction-server-reconciliation.html)
