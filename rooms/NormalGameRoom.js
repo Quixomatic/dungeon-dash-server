@@ -1,3 +1,4 @@
+// server/rooms/NormalGameRoom.js
 import { BaseRoom } from "./BaseRoom.js";
 import { GameRoomState } from "../schemas/GameRoomState.js";
 import { PlayerState } from "../schemas/PlayerState.js";
@@ -16,12 +17,12 @@ export class NormalGameRoom extends BaseRoom {
     this.autoDispose = true;
     
     // Initialize systems
-    this.inputHandler = new InputHandler(this);
-    this.phaseManager = new PhaseManager(this);
-    this.eventManager = new EventManager(this);
-    this.collisionSystem = new CollisionSystem(this);
-    this.leaderboardSystem = new LeaderboardSystem(this);
-    this.dungeonGenerator = new DungeonGenerator(this);
+    this.inputHandler = null;
+    this.phaseManager = null;
+    this.eventManager = null;
+    this.collisionSystem = null;
+    this.leaderboardSystem = null;
+    this.dungeonGenerator = null;
   }
 
   onCreate(options) {
@@ -29,6 +30,14 @@ export class NormalGameRoom extends BaseRoom {
     
     // Initialize room state
     this.setState(new GameRoomState());
+    
+    // Initialize systems
+    this.inputHandler = new InputHandler(this);
+    this.phaseManager = new PhaseManager(this);
+    this.eventManager = new EventManager(this);
+    this.collisionSystem = new CollisionSystem(this);
+    this.leaderboardSystem = new LeaderboardSystem(this);
+    this.dungeonGenerator = new DungeonGenerator(this);
     
     // Set initial phase
     this.phaseManager.setPhase("lobby");
@@ -38,6 +47,8 @@ export class NormalGameRoom extends BaseRoom {
     
     // Start waiting for players
     this.phaseManager.waitForPlayers();
+    
+    console.log(`Room created: ${this.roomId} with options:`, options);
   }
 
   onJoin(client, options) {
@@ -53,9 +64,9 @@ export class NormalGameRoom extends BaseRoom {
     player.position.x = 400 + (Math.random() * 100 - 50);
     player.position.y = 300 + (Math.random() * 100 - 50);
     
-    // Initialize input tracking properties
+    // Initialize player properties
     player.lastInputSeq = 0;
-    player.inputQueue = [];
+    player.moveSpeed = 300; // pixels per second
     
     // Add player to room state
     this.state.players[client.id] = player;
@@ -77,6 +88,8 @@ export class NormalGameRoom extends BaseRoom {
     
     // Check if we should start game countdown
     this.phaseManager.checkGameStart();
+    
+    console.log(`Player ${player.name} (${client.id}) joined room ${this.roomId}`);
   }
 
   onLeave(client, consented) {
@@ -97,11 +110,37 @@ export class NormalGameRoom extends BaseRoom {
     
     // Check if game should end or countdown should reset
     this.phaseManager.handlePlayerLeave();
+    
+    console.log(`Player ${playerName} (${client.id}) left room ${this.roomId}. Consented: ${consented}`);
   }
   
   registerMessageHandlers() {
-    // Register all message handlers from the input handler
+    // Register input handler messages
     this.inputHandler.registerHandlers();
+    
+    // Player ready handler
+    this.onMessage("ready", (client, message) => {
+      const player = this.state.players[client.id];
+      if (!player) return;
+      
+      player.ready = true;
+      
+      // Check if all players are ready
+      this.phaseManager.checkAllPlayersReady();
+    });
+    
+    // Chat message handler
+    this.onMessage("chat", (client, message) => {
+      const player = this.state.players[client.id];
+      if (!player) return;
+      
+      // Broadcast chat message to all clients
+      this.broadcast("chatMessage", {
+        senderId: client.id,
+        senderName: player.name,
+        message: message.text.substring(0, 200) // Limit message length
+      });
+    });
   }
   
   fixedUpdate(deltaTime) {
@@ -113,5 +152,15 @@ export class NormalGameRoom extends BaseRoom {
     
     // Process collisions
     this.collisionSystem.update(deltaTime);
+    
+    // Update leaderboard periodically
+    if (this.state.gameStarted && Date.now() % 5000 < deltaTime) {
+      this.leaderboardSystem.updateLeaderboard();
+    }
+  }
+  
+  onDispose() {
+    console.log(`Room ${this.roomId} disposing...`);
+    super.onDispose();
   }
 }
