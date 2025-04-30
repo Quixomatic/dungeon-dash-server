@@ -180,7 +180,7 @@ export class InputHandler {
       player.position.x = Math.max(0, Math.min(player.position.x, 800));
       player.position.y = Math.max(0, Math.min(player.position.y, 600));
 
-      console.log(input.seq, input.delta, moveAmount, player.position.x, player.position.y);
+      //console.log(input.seq, input.delta, moveAmount, player.position.x, player.position.y);
       
       // Keep track of last processed input
       lastProcessedInput = input;
