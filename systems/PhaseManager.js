@@ -166,8 +166,16 @@ export class PhaseManager {
       this.setPhase(this.PHASES.DUNGEON);
       this.room.state.phaseEndTime = Date.now() + this.dungeonPhaseDuration;
       
-      // Generate dungeons for each player
-      this.room.dungeonGenerator.generateDungeons();
+      // Generate dungeons for players using MapManager instead of the old DungeonGenerator
+      if (this.room.mapManager) {
+        // If this is the first dungeon phase, the map is already generated
+        // For subsequent phases, generate a new floor
+        if (this.room.mapManager.floorLevel > 1 || !this.room.mapManager.currentMap) {
+          this.room.mapManager.generateNextFloor();
+        }
+      } else {
+        console.error("MapManager not available!");
+      }
       
       // Broadcast phase change
       this.room.broadcast("phaseChange", {

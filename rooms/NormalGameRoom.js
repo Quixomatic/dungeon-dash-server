@@ -9,6 +9,7 @@ import { EventManager } from "../systems/EventManager.js";
 import { CollisionSystem } from "../systems/CollisionSystem.js";
 import { LeaderboardSystem } from "../systems/LeaderboardSystem.js";
 import { DungeonGenerator } from "../systems/DungeonGenerator.js";
+import { MapManager } from "../systems/MapManager.js";
 
 export class NormalGameRoom extends BaseRoom {
   constructor() {
@@ -37,7 +38,12 @@ export class NormalGameRoom extends BaseRoom {
     this.eventManager = new EventManager(this);
     this.collisionSystem = new CollisionSystem(this);
     this.leaderboardSystem = new LeaderboardSystem(this);
-    this.dungeonGenerator = new DungeonGenerator(this);
+    
+    // Initialize dungeon generation
+    this.mapManager = new MapManager(this);
+    
+    // Generate initial map
+    const initialMap = this.mapManager.generateFirstFloor();
     
     // Set initial phase
     this.phaseManager.setPhase("lobby");
@@ -60,9 +66,10 @@ export class NormalGameRoom extends BaseRoom {
     player.name = options.name || `Player_${client.id.substr(0, 6)}`;
     player.joinTime = Date.now();
     
-    // Set random starting position
-    player.position.x = 400;// + (Math.random() * 100 - 50);
-    player.position.y = 300;// + (Math.random() * 100 - 50);
+    // Set spawn position using map manager
+    const spawnPos = this.mapManager ? this.mapManager.getSpawnPosition() : { x: 400, y: 300 };
+    player.position.x = spawnPos.x;
+    player.position.y = spawnPos.y;
     
     // Initialize player properties
     player.lastInputSeq = 0;
@@ -77,6 +84,22 @@ export class NormalGameRoom extends BaseRoom {
       playerId: client.id,
       roomId: this.roomId
     });
+    
+    // Send map data to new player
+    if (this.mapManager && this.mapManager.currentMap) {
+      client.send("mapData", {
+        width: this.mapManager.currentMap.width,
+        height: this.mapManager.currentMap.height,
+        floorLevel: this.mapManager.floorLevel,
+        rooms: this.mapManager.currentMap.rooms.map(r => ({
+          id: r.id, x: r.x, y: r.y, width: r.width, height: r.height, type: r.type
+        })),
+        corridors: this.mapManager.currentMap.corridors.map(c => ({
+          start: c.start, end: c.end, waypoint: c.waypoint
+        })),
+        spawnPoints: this.mapManager.currentMap.spawnPoints
+      });
+    }
     
     // Broadcast player joined message
     this.broadcast("playerJoined", {
