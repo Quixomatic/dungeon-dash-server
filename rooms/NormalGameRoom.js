@@ -61,8 +61,8 @@ export class NormalGameRoom extends BaseRoom {
     player.joinTime = Date.now();
     
     // Set random starting position
-    player.position.x = 400 + (Math.random() * 100 - 50);
-    player.position.y = 300 + (Math.random() * 100 - 50);
+    player.position.x = 400;// + (Math.random() * 100 - 50);
+    player.position.y = 300;// + (Math.random() * 100 - 50);
     
     // Initialize player properties
     player.lastInputSeq = 0;

@@ -159,6 +159,69 @@ dungeon-dash-royale/
    - Add countdown timers
    - Create spectator mode
 
+## 🔄 Movement System Implementation
+
+### Architecture Overview
+We've implemented a robust client-server movement system with the following characteristics:
+- **Local-first movement**: Immediate, responsive player controls
+- **Client-side prediction**: Movement is applied locally first, then verified by the server
+- **Server authority**: Server makes final decisions on player positions
+- **Input sequencing**: Each input command is tracked with sequence numbers
+- **Reconciliation**: Client corrects position when server and client diverge significantly
+
+### Key Components
+
+#### Client-Side
+1. **InputHandler**: Captures player input, applies it locally, and sends to server
+   - Tracks input sequence numbers
+   - Maintains a queue of pending inputs
+   - Applies movement with proper physics
+
+2. **PlayerManager**: Handles player entity creation and rendering
+   - Manages local player and other players
+   - Provides smooth interpolation for other players' movements
+
+3. **NetworkHandler**: Handles communication with the server
+   - Sends batched input commands
+   - Processes player movement messages
+   - Handles server acknowledgements
+
+4. **ReconciliationManager**: Manages server corrections
+   - Compares server position with predicted position
+   - Only reconciles when difference exceeds threshold
+   - Reapplies pending inputs after corrections
+
+#### Server-Side
+1. **InputHandler**: Processes client inputs at a fixed tick rate
+   - Deduplicates inputs based on sequence numbers
+   - Applies movement using identical physics to client
+   - Sends acknowledgements with authoritative positions
+   - Broadcasts position updates to other clients
+
+2. **NormalGameRoom**: Manages the game world and player states
+   - Processes inputs during fixed update cycles
+   - Manages player joining/leaving
+   - Coordinates game phases
+
+### Optimizations
+The movement system includes several optimizations:
+- **Input batching**: Sends multiple inputs in a single network message
+- **Sequence tracking**: Prevents duplicate processing of inputs
+- **Threshold-based reconciliation**: Only corrects significant discrepancies
+- **Consistent physics**: Ensures client and server calculate movement identically
+
+### Technical Challenges Solved
+1. **Input synchronization**: Ensured all inputs reach the server in correct order
+2. **Duplicate processing**: Prevented server from processing the same input multiple times
+3. **Starting position**: Fixed discrepancy between client and server starting positions
+4. **Physics matching**: Ensured identical movement calculations on both sides
+
+### Future Improvements
+1. **Input compression**: Reduce network traffic by compressing input messages
+2. **Predictive collision**: Handle collisions consistently between client and server
+3. **Anti-cheat measures**: Add additional validation to prevent speed/position hacking
+4. **Connection quality adaptation**: Adjust reconciliation based on network latency
+
 ## 💻 Development Notes
 
 ### Fixed Tick Rate System
