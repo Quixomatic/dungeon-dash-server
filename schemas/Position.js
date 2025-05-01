@@ -1,5 +1,5 @@
 // server/schemas/Position.js
-import { Schema, type } from "@colyseus/schema";
+import { Schema, type, defineTypes } from "@colyseus/schema";
 
 export class Position extends Schema {
   constructor(x = 0, y = 0) {
@@ -9,7 +9,7 @@ export class Position extends Schema {
   }
 }
 
-type(Position, {
+defineTypes(Position, {
   x: "number",
   y: "number"
 });

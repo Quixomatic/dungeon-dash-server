@@ -1,5 +1,5 @@
 // server/schemas/Item.js
-import { Schema, type } from "@colyseus/schema";
+import { Schema, defineTypes, type } from "@colyseus/schema";
 
 export class Item extends Schema {
   constructor() {
@@ -12,7 +12,7 @@ export class Item extends Schema {
   }
 }
 
-type(Item, {
+defineTypes(Item, {
   id: "string",
   name: "string",
   type: "string",

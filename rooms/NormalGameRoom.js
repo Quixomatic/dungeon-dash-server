@@ -12,6 +12,8 @@ import { DungeonGenerator } from "../systems/DungeonGenerator.js";
 import { MapManager } from "../systems/MapManager.js";
 
 export class NormalGameRoom extends BaseRoom {
+  state = new GameRoomState();
+
   constructor() {
     super();
     this.maxClients = 100;
@@ -30,7 +32,7 @@ export class NormalGameRoom extends BaseRoom {
     super.onCreate(options);
     
     // Initialize room state
-    this.setState(new GameRoomState());
+    //this.state = new GameRoomState();
     
     // Initialize systems
     this.inputHandler = new InputHandler(this);
@@ -76,13 +78,19 @@ export class NormalGameRoom extends BaseRoom {
     player.moveSpeed = 300; // pixels per second
     
     // Add player to room state
-    this.state.players[client.id] = player;
+    //this.state.players[client.id] = player;
+    this.state.players.set(client.id, player);
+    console.log(player.position.x, player.position.y);
     
     // Send welcome message
     client.send("welcome", {
       message: `Welcome to Dungeon Dash Royale, ${player.name}!`,
       playerId: client.id,
-      roomId: this.roomId
+      roomId: this.roomId,
+      position: {
+        x: player.position.x,
+        y: player.position.y
+      }
     });
     
     // Send map data to new player

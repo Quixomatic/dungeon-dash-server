@@ -1,5 +1,5 @@
 // server/schemas/GameRoomState.js
-import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { Schema, type, MapSchema, ArraySchema, schema, defineTypes } from "@colyseus/schema";
 import { PlayerState } from "./PlayerState.js";
 
 export class GameRoomState extends Schema {
@@ -20,7 +20,7 @@ export class GameRoomState extends Schema {
   }
 }
 
-type(GameRoomState, {
+defineTypes(GameRoomState, {
   players: { map: PlayerState },
   gameStarted: "boolean",
   gameEnded: "boolean",
@@ -32,3 +32,16 @@ type(GameRoomState, {
   phase: "string",
   phaseEndTime: "number"
 });
+
+/*type(GameRoomState, {
+  players: { map: PlayerState },
+  gameStarted: "boolean",
+  gameEnded: "boolean",
+  timeRemaining: "number",
+  countdown: "number",
+  winner: "string",
+  leaderboard: ["string"],
+  globalEvents: ["string"],
+  phase: "string",
+  phaseEndTime: "number"
+});*/

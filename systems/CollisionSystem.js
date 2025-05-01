@@ -20,6 +20,7 @@ export class CollisionSystem {
     }
     
     checkPlayerPlayerCollisions() {
+      return;
       // For simple collision detection between players
       const players = Object.values(this.room.state.players);
       

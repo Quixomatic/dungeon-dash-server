@@ -10,23 +10,31 @@ Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics w
    - Players join a lobby of up to 100 participants
    - Wait for enough players to join
 
-2. **Dungeon Phase**
-   - Players navigate their individual procedurally generated dungeons
+2. **Dungeon Exploration Phase**
+   - All players spawn at different points on a large shared dungeon floor
+   - Players explore the procedurally generated dungeon
    - Collect gear and items to boost stats
-   - Defeat enemies to gain XP
-   - Level up and select boons/abilities (attack speed, crit chance, etc.)
-   - Time-limited exploration (5-10 minutes)
+   - Defeat AI enemies to gain XP
+   - Level up and select boons/abilities
+   - Players may encounter and battle other players while exploring
+   - Phase lasts for a set amount of time (5-10 minutes)
 
-3. **Gauntlet Phase**
-   - Players are grouped into small "gauntlets" of 4-5 players
-   - Battle with all collected gear and abilities
-   - Last player standing in each gauntlet continues
-   - Eliminated players can spectate or join a new game
+3. **Floor Collapse**
+   - After the time limit, the current dungeon floor "collapses"
+   - Surviving players fall to the next floor of the dungeon
+   - Each new floor is smaller than the previous one
+   - This forces remaining players into closer proximity
 
-4. **Repeat and Reduce**
-   - Return to dungeon phase with surviving players
-   - Next gauntlet features fewer, but more powerful players
-   - Continue until only one player remains
+4. **Repeat Until Victory**
+   - Exploration and collapse cycles continue
+   - Each floor becomes increasingly dangerous
+   - Player density increases as the floor size decreases
+   - The last player standing wins the match
+
+5. **Final Showdown (Optional)**
+   - If the game lasts too long, a final "forced combat" phase begins
+   - The remaining players are teleported to a small arena
+   - A battle royale ensues until only one player remains
 
 ## 🛠️ Technical Stack
 
@@ -106,6 +114,7 @@ dungeon-dash-royale/
 - [x] 60Hz fixed tick rate system
 - [x] Client-side prediction with server reconciliation
 - [x] Smooth interpolation for other players
+- [x] Centralized GameState management for cross-scene state
 
 ### Server Features
 - [x] Room creation and management
@@ -115,6 +124,7 @@ dungeon-dash-royale/
 - [x] Event system
 - [x] Input handling and validation
 - [x] Leaderboard system
+- [x] Player position synchronization
 
 ### Client Features
 - [x] Lobby scene with connection UI
@@ -124,6 +134,7 @@ dungeon-dash-royale/
 - [x] Debug information display
 - [x] Responsive local player controls
 - [x] Smooth remote player movement
+- [x] Server-determined player spawn positions
 
 ## 🚀 Next Steps
 
@@ -159,68 +170,45 @@ dungeon-dash-royale/
    - Add countdown timers
    - Create spectator mode
 
-## 🔄 Movement System Implementation
+## 🔄 State Management System
 
-### Architecture Overview
-We've implemented a robust client-server movement system with the following characteristics:
-- **Local-first movement**: Immediate, responsive player controls
-- **Client-side prediction**: Movement is applied locally first, then verified by the server
-- **Server authority**: Server makes final decisions on player positions
-- **Input sequencing**: Each input command is tracked with sequence numbers
-- **Reconciliation**: Client corrects position when server and client diverge significantly
+We've implemented a centralized GameState system that acts as a single source of truth for all game data across scenes:
 
 ### Key Components
 
-#### Client-Side
-1. **InputHandler**: Captures player input, applies it locally, and sends to server
-   - Tracks input sequence numbers
-   - Maintains a queue of pending inputs
-   - Applies movement with proper physics
+1. **GameState Singleton**
+   - Maintains player data, game phase, and other critical information
+   - Accessible from any scene or component
+   - Provides event system for changes
+   - Persists data between scene transitions
 
-2. **PlayerManager**: Handles player entity creation and rendering
-   - Manages local player and other players
-   - Provides smooth interpolation for other players' movements
+2. **Server-Client Synchronization**
+   - Server determines initial player positions
+   - Client receives positions through welcome messages and state updates
+   - GameState initialized with server-provided coordinates
+   - Player Manager renders players at correct positions
 
-3. **NetworkHandler**: Handles communication with the server
-   - Sends batched input commands
-   - Processes player movement messages
-   - Handles server acknowledgements
+3. **Schema System**
+   - Using Colyseus Schema for efficient state synchronization
+   - Schema definitions with `defineTypes` for proper serialization
+   - MapSchema for tracking players by ID
 
-4. **ReconciliationManager**: Manages server corrections
-   - Compares server position with predicted position
-   - Only reconciles when difference exceeds threshold
-   - Reapplies pending inputs after corrections
+### Game Flow
 
-#### Server-Side
-1. **InputHandler**: Processes client inputs at a fixed tick rate
-   - Deduplicates inputs based on sequence numbers
-   - Applies movement using identical physics to client
-   - Sends acknowledgements with authoritative positions
-   - Broadcasts position updates to other clients
+1. Player joins through Lobby Scene:
+   - Connects to server and adds to GameState
+   - Server assigns position upon player join
+   - Welcome message includes position information
 
-2. **NormalGameRoom**: Manages the game world and player states
-   - Processes inputs during fixed update cycles
-   - Manages player joining/leaving
-   - Coordinates game phases
+2. Transition to Game Scene:
+   - GameState provides player information
+   - Player rendered at server-determined position
+   - Other players synchronized through state updates
 
-### Optimizations
-The movement system includes several optimizations:
-- **Input batching**: Sends multiple inputs in a single network message
-- **Sequence tracking**: Prevents duplicate processing of inputs
-- **Threshold-based reconciliation**: Only corrects significant discrepancies
-- **Consistent physics**: Ensures client and server calculate movement identically
-
-### Technical Challenges Solved
-1. **Input synchronization**: Ensured all inputs reach the server in correct order
-2. **Duplicate processing**: Prevented server from processing the same input multiple times
-3. **Starting position**: Fixed discrepancy between client and server starting positions
-4. **Physics matching**: Ensured identical movement calculations on both sides
-
-### Future Improvements
-1. **Input compression**: Reduce network traffic by compressing input messages
-2. **Predictive collision**: Handle collisions consistently between client and server
-3. **Anti-cheat measures**: Add additional validation to prevent speed/position hacking
-4. **Connection quality adaptation**: Adjust reconciliation based on network latency
+3. Gameplay:
+   - Position updates handled through server broadcasts
+   - GameState updates reflect current server state
+   - Smooth interpolation for other players
 
 ## 💻 Development Notes
 
@@ -237,10 +225,12 @@ The movement system includes several optimizations:
 4. Server sends acknowledgement with position
 5. Client reconciles if prediction was incorrect
 
-### Interpolation System
-- Other players' positions are interpolated
-- Linear interpolation factor: 0.3 (adjustable)
-- Updates at client frame rate (60+ FPS)
+### GameState Usage
+- Import the singleton: `import gameState from '../systems/GameState.js';`
+- Access player data: `gameState.getPlayer(id)`
+- Track phase changes: `gameState.addEventListener('phaseChange', callback)`
+- Add new players: `gameState.addPlayer(id, playerData)`
+- Remove players: `gameState.removePlayer(id)`
 
 ## 🔧 Developer Setup
 
@@ -265,31 +255,3 @@ The movement system includes several optimizations:
 - [Colyseus Documentation](https://docs.colyseus.io/)
 - [Phaser 3 Documentation](https://newdocs.phaser.io/docs/3.60.0)
 - [Client-Side Prediction Guide](https://www.gabrielgambetta.com/client-side-prediction-server-reconciliation.html)
-
-## 🚀 Project Status & Next Steps
-
-### Current Implementation
-- **Completed**: Robust multiplayer movement system with client-side prediction and server reconciliation
-- **Completed**: 60Hz server tick rate with decoupled client frame rates
-- **Completed**: Input sequencing, batching, and deduplication
-- **Completed**: Smooth interpolation for other players
-
-### Architecture Overview
-Our game uses a hybrid client-server architecture:
-- **Server**: NodeJS with Colyseus framework handling game state, input processing, and physics at 60Hz
-- **Client**: Phaser 3 for rendering, input capture, and client-side prediction
-- **Network Protocol**: WebSockets through Colyseus with custom message handlers
-
-### Next Development Priorities
-1. **Dungeon Generation System**: Implement procedural dungeon generation for the exploration phase
-2. **Combat Mechanics**: Develop player combat with abilities, targeting, and damage calculation
-3. **Game Loop Phases**: Implement transitions between lobby, dungeon, and gauntlet phases
-4. **Item & Ability Systems**: Create pickups, equipment, and special abilities
-
-### Technical Debt & Optimization
-- Possible input compression to reduce network traffic
-- Additional anti-cheat measures for position validation
-- Performance optimization for large player counts
-
-### Development Approach
-We're taking a modular, component-based approach where each system is encapsulated in its own manager class. We're maintaining a strict separation between client-side prediction and server authority to ensure fairness while providing responsive gameplay.

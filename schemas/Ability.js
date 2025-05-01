@@ -1,5 +1,5 @@
 // server/schemas/Ability.js
-import { Schema, type } from "@colyseus/schema";
+import { Schema, defineTypes, type } from "@colyseus/schema";
 
 export class Ability extends Schema {
   constructor() {
@@ -11,7 +11,7 @@ export class Ability extends Schema {
   }
 }
 
-type(Ability, {
+defineTypes(Ability, {
   id: "string",
   name: "string",
   cooldown: "number",

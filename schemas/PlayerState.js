@@ -1,5 +1,5 @@
 // server/schemas/PlayerState.js
-import { Schema, type, ArraySchema } from "@colyseus/schema";
+import { Schema, type, ArraySchema, defineTypes } from "@colyseus/schema";
 import { Position } from "./Position.js";
 import { Item } from "./Item.js";
 import { Ability } from "./Ability.js";
@@ -23,19 +23,19 @@ export class PlayerState extends Schema {
     this.lastMoveTime = 0;
     this.moveSpeed = 300; // units per second
     this.gauntletId = null;
-    
+
     // These are not synchronized - server side only
     this._inputQueue = [];
     this._currentInput = {
       left: false,
       right: false,
       up: false,
-      down: false
+      down: false,
     };
   }
 }
 
-type(PlayerState, {
+defineTypes(PlayerState, {
   id: "string",
   name: "string",
   ready: "boolean",
@@ -52,6 +52,4 @@ type(PlayerState, {
   lastMoveTime: "number",
   moveSpeed: "number",
   gauntletId: "string",
-  _inputQueue: "array",
-  _currentInput: "object"
 });

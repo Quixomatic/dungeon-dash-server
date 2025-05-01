@@ -5,6 +5,7 @@ export class InputHandler {
     this.room = room;
     this.fixedTimestep = 16.67; // 60Hz
     this.playerInputQueues = new Map(); // Map of player ID to input queue
+    this.debug = false; // Enable debug logging for input processing
     
     // NEW: Track the highest processed sequence number for each player
     this.playerProcessedSequences = new Map(); // Map of player ID to highest processed sequence
@@ -14,7 +15,7 @@ export class InputHandler {
     // Handle input batch
     this.room.onMessage("playerInputBatch", (client, message) => {
       // Get player
-      const player = this.room.state.players[client.id];
+      const player = this.room.state.players.get(client.id);
       if (!player) return;
       
       // Initialize tracking for this player if not exists
@@ -33,7 +34,7 @@ export class InputHandler {
       const inputQueue = this.playerInputQueues.get(client.id);
       
       if (message.inputs && Array.isArray(message.inputs)) {
-        console.log(`Received input batch from ${client.id} with ${message.inputs.length} inputs`);
+        this.debug && console.log(`Received input batch from ${client.id} with ${message.inputs.length} inputs`);
         
         // Filter out already processed inputs and track seen sequences to avoid duplicates
         const existingSequences = new Set(inputQueue.map(input => input.seq));
@@ -49,7 +50,7 @@ export class InputHandler {
           );
         });
         
-        console.log(`Adding ${newInputs.length} new inputs, discarding ${message.inputs.length - newInputs.length} duplicate or processed inputs`);
+        this.debug && console.log(`Adding ${newInputs.length} new inputs, discarding ${message.inputs.length - newInputs.length} duplicate or processed inputs`);
         
         // Add only new, unique inputs to the queue
         newInputs.forEach(input => {
@@ -74,7 +75,7 @@ export class InputHandler {
     // Handle single input (original handler)
     this.room.onMessage("playerInput", (client, message) => {
       // Get player
-      const player = this.room.state.players[client.id];
+      const player = this.room.state.players.get(client.id);
       if (!player) return;
       
       // Initialize tracking if not exists
@@ -100,7 +101,7 @@ export class InputHandler {
         // Update player's last input sequence
         player.lastInputSeq = Math.max(player.lastInputSeq || 0, message.seq || 0);
       } else {
-        console.log(`Ignoring already processed input with sequence ${message.seq} from ${client.id}`);
+        this.debug && console.log(`Ignoring already processed input with sequence ${message.seq} from ${client.id}`);
       }
     });
   }
@@ -112,7 +113,7 @@ export class InputHandler {
       if (inputQueue.length === 0) continue;
       
       // Get player
-      const player = this.room.state.players[clientId];
+      const player = this.room.state.players.get(clientId);
       if (!player) continue;
       
       // Filter out duplicate sequence numbers (keep only the most recent for each seq)
@@ -131,7 +132,7 @@ export class InputHandler {
       // Sort by sequence number
       uniqueInputs.sort((a, b) => (a.seq || 0) - (b.seq || 0));
       
-      console.log(`Processing ${uniqueInputs.length} unique inputs for player ${clientId}`);
+      this.debug && console.log(`Processing ${uniqueInputs.length} unique inputs for player ${clientId}`);
       
       // Process the unique, sorted inputs
       const processedInput = this.processPlayerInputs(clientId, player, uniqueInputs, deltaTime);
@@ -161,7 +162,7 @@ export class InputHandler {
     
     let lastProcessedInput = null;
     
-    console.log(`Processing ${inputQueue.length} inputs for player ${clientId}`);
+    this.debug && console.log(`Processing ${inputQueue.length} inputs for player ${clientId}`);
     
     // Process each input
     for (const input of inputQueue) {

@@ -56,8 +56,11 @@ export class PhaseManager {
     }
     
     checkGameStart() {
+      console.log(`Checking game start conditions in room ${this.room.roomId}...`);
+      console.log(`Current players: ${this.room.state.players.size}`);
+
       // If enough players, start countdown
-      if (Object.keys(this.room.state.players).length >= this.minPlayersToStart) {
+      if (this.room.state.players.size >= this.minPlayersToStart) {
         this.startGameCountdown();
       }
     }
