@@ -9,6 +9,8 @@ Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics w
 1. **Lobby Phase**
    - Players join a lobby of up to 100 participants
    - Wait for enough players to join
+   - Map data is loaded and synchronized across all clients
+   - Game starts only when all players have loaded the map
 
 2. **Dungeon Exploration Phase**
    - All players spawn at different points on a large shared dungeon floor
@@ -74,7 +76,8 @@ dungeon-dash-royale/
 │       │   ├── NetworkHandler.js  # Handles network communication
 │       │   ├── InputHandler.js    # Handles player input
 │       │   ├── UIManager.js       # Manages UI elements
-│       │   └── DebugManager.js    # Debug visualization
+│       │   ├── DebugManager.js    # Debug visualization
+│       │   └── DungeonRenderer.js # Renders the dungeon map
 │       ├── scenes/             # Phaser scenes
 │       │   ├── LobbyScene.js   # Matchmaking lobby
 │       │   ├── GameScene.js    # Main gameplay
@@ -93,9 +96,11 @@ dungeon-dash-royale/
 │   │   └── NormalGameRoom.js   # Standard game mode
 │   ├── schemas/                # Colyseus state schemas
 │   │   ├── PlayerState.js
+│   │   ├── StatsSchema.js      # Player stats schema
 │   │   ├── GameRoomState.js
 │   │   ├── Position.js
 │   │   ├── Item.js
+│   │   ├── DungeonSchema.js    # Compact dungeon representation
 │   │   └── Ability.js
 │   └── systems/                # Server-side game logic
 │       ├── InputHandler.js     # Processes player inputs
@@ -103,7 +108,9 @@ dungeon-dash-royale/
 │       ├── EventManager.js     # Handles global events
 │       ├── CollisionSystem.js  # Collision detection
 │       ├── LeaderboardSystem.js # Player rankings
-│       └── DungeonGenerator.js # Generates dungeons
+│       ├── MapManager.js       # Manages dungeon maps
+│       ├── BSPDungeonGenerator.js # Generates dungeons using BSP
+│       └── RoomTemplates.js    # Room templates for dungeon generation
 ```
 
 ## 🔄 Current Progress
@@ -115,6 +122,7 @@ dungeon-dash-royale/
 - [x] Client-side prediction with server reconciliation
 - [x] Smooth interpolation for other players
 - [x] Centralized GameState management for cross-scene state
+- [x] Tile-based dungeon generation using Binary Space Partitioning
 
 ### Server Features
 - [x] Room creation and management
@@ -125,6 +133,9 @@ dungeon-dash-royale/
 - [x] Input handling and validation
 - [x] Leaderboard system
 - [x] Player position synchronization
+- [x] Procedural dungeon generation
+- [x] Spawn point allocation
+- [x] Map data synchronization
 
 ### Client Features
 - [x] Lobby scene with connection UI
@@ -135,21 +146,31 @@ dungeon-dash-royale/
 - [x] Responsive local player controls
 - [x] Smooth remote player movement
 - [x] Server-determined player spawn positions
+- [x] Efficient dungeon rendering with culling
+- [x] Minimap for navigation
+- [x] Map loading synchronization
+- [x] Adaptive tile size handling
+- [x] Responsive UI design
 
 ## 🚀 Next Steps
 
 ### Immediate Priorities
-1. **Implement Dungeon Generation**
-   - Create procedural dungeon generator
-   - Implement room types and corridors
-   - Add obstacles and collectibles
+1. **Finalize Dungeon Rendering**
+   - Ensure corridors are properly rendered
+   - Implement collision detection with dungeon walls
+   - Fix any remaining tile rendering issues
 
-2. **Create Item and Ability System**
+2. **Enhance Dungeon Generation**
+   - Add more room templates
+   - Add environmental obstacles
+   - Add collectibles and items
+
+3. **Create Item and Ability System**
    - Define item types and effects
    - Implement player inventory
    - Create ability activation logic
 
-3. **Build Combat System**
+4. **Build Combat System**
    - Implement attack mechanics
    - Create health and damage calculations
    - Add visual effects for combat
@@ -181,6 +202,7 @@ We've implemented a centralized GameState system that acts as a single source of
    - Accessible from any scene or component
    - Provides event system for changes
    - Persists data between scene transitions
+   - Stores map data for consistent access
 
 2. **Server-Client Synchronization**
    - Server determines initial player positions
@@ -192,6 +214,7 @@ We've implemented a centralized GameState system that acts as a single source of
    - Using Colyseus Schema for efficient state synchronization
    - Schema definitions with `defineTypes` for proper serialization
    - MapSchema for tracking players by ID
+   - Nested schemas for efficient state organization (StatsSchema)
 
 ### Game Flow
 
@@ -199,11 +222,15 @@ We've implemented a centralized GameState system that acts as a single source of
    - Connects to server and adds to GameState
    - Server assigns position upon player join
    - Welcome message includes position information
+   - Server sends map data to all clients
+   - Clients confirm map loading status
+   - Game starts when all players have loaded the map
 
 2. Transition to Game Scene:
    - GameState provides player information
    - Player rendered at server-determined position
    - Other players synchronized through state updates
+   - Map data retrieved from GameState
 
 3. Gameplay:
    - Position updates handled through server broadcasts
@@ -211,6 +238,14 @@ We've implemented a centralized GameState system that acts as a single source of
    - Smooth interpolation for other players
 
 ## 💻 Development Notes
+
+### Tile-Based Dungeon Generation
+- Maps now use proper tile coordinates rather than pixel coordinates
+- Default tile size of 64px, configurable at runtime
+- Dungeon generation using Binary Space Partitioning (BSP) algorithm
+- Custom room templates with different types (standard, spawn, etc.)
+- Efficient dungeon rendering with tile culling
+- L-shaped corridors connecting rooms
 
 ### Fixed Tick Rate System
 - Server runs at 60Hz (16.67ms)
@@ -231,6 +266,7 @@ We've implemented a centralized GameState system that acts as a single source of
 - Track phase changes: `gameState.addEventListener('phaseChange', callback)`
 - Add new players: `gameState.addPlayer(id, playerData)`
 - Remove players: `gameState.removePlayer(id)`
+- Access map data: `gameState.getMapData()`
 
 ## 🔧 Developer Setup
 

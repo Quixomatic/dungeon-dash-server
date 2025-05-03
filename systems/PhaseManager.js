@@ -58,8 +58,17 @@ export class PhaseManager {
     checkGameStart() {
       console.log(`Checking game start conditions in room ${this.room.roomId}...`);
       console.log(`Current players: ${this.room.state.players.size}`);
-
-      // If enough players, start countdown
+    
+      // Check if all players have loaded the map
+      const allPlayersMapLoaded = Array.from(this.room.state.players.values())
+        .every(player => player.mapLoaded);
+      
+      if (!allPlayersMapLoaded) {
+        console.log("Waiting for all players to load the map...");
+        return;
+      }
+    
+      // If enough players AND map is loaded by all, start countdown
       if (this.room.state.players.size >= this.minPlayersToStart) {
         this.startGameCountdown();
       }

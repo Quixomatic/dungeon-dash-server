@@ -1,8 +1,9 @@
 // server/schemas/PlayerState.js
-import { Schema, type, ArraySchema, defineTypes } from "@colyseus/schema";
+import { Schema, ArraySchema, defineTypes } from "@colyseus/schema";
 import { Position } from "./Position.js";
 import { Item } from "./Item.js";
 import { Ability } from "./Ability.js";
+import { StatsSchema } from "./StatsSchema.js";
 
 export class PlayerState extends Schema {
   constructor() {
@@ -11,9 +12,7 @@ export class PlayerState extends Schema {
     this.name = "";
     this.ready = false;
     this.position = new Position();
-    this.health = 100;
-    this.maxHealth = 100;
-    this.level = 1;
+    this.stats = new StatsSchema(); // Nested schema for most stats
     this.items = new ArraySchema();
     this.abilities = new ArraySchema();
     this.currentProgress = 0;
@@ -21,8 +20,9 @@ export class PlayerState extends Schema {
     this.completedObjectives = new ArraySchema();
     this.joinTime = Date.now();
     this.lastMoveTime = 0;
-    this.moveSpeed = 300; // units per second
+    this.moveSpeed = 300; // Keep moveSpeed directly on PlayerState
     this.gauntletId = null;
+    this.mapLoaded = false; // New flag for map loading status
 
     // These are not synchronized - server side only
     this._inputQueue = [];
@@ -40,9 +40,7 @@ defineTypes(PlayerState, {
   name: "string",
   ready: "boolean",
   position: Position,
-  health: "number",
-  maxHealth: "number",
-  level: "number",
+  stats: StatsSchema,
   items: [Item],
   abilities: [Ability],
   currentProgress: "number",
@@ -50,6 +48,7 @@ defineTypes(PlayerState, {
   completedObjectives: ["string"],
   joinTime: "number",
   lastMoveTime: "number",
-  moveSpeed: "number",
+  moveSpeed: "number", // Keep directly on PlayerState
   gauntletId: "string",
+  mapLoaded: "boolean", // Define the new property type
 });
