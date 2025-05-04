@@ -2,6 +2,8 @@
 
 import { EnhancedBSPGenerator } from "./EnhancedBSPGenerator.js";
 import { ROOM_TEMPLATES, getTemplateById } from "./RoomTemplates.js";
+import roomTemplates from "../dungeonGenerator/roomTemplates.js";
+import { generate } from "../dungeonGenerator/dungeon.js";
 
 /**
  * MapManager - Manages dungeon map generation and distribution
@@ -30,9 +32,12 @@ export class MapManager {
     this.tileSize = config.tileSize || 64;
 
     // Recalculate world dimensions in tiles
-    this.worldTileWidth = Math.floor((config.worldSize || 20000) / this.tileSize);
-    this.worldTileHeight =
-      Math.floor((config.worldSize || 20000) / this.tileSize);
+    this.worldTileWidth = Math.floor(
+      (config.worldSize || 20000) / this.tileSize
+    );
+    this.worldTileHeight = Math.floor(
+      (config.worldSize || 20000) / this.tileSize
+    );
 
     console.log(
       `Map initialized with ${this.worldTileWidth}x${this.worldTileHeight} tiles (${this.tileSize}px each)`
@@ -47,13 +52,16 @@ export class MapManager {
    */
   generateFirstFloor() {
     console.log("Generating first dungeon floor");
-    
+
     // Get player count (or use a minimum of 4)
-    const playerCount = Math.max(4, Object.keys(this.room.state.players || {}).length);
-    
+    const playerCount = Math.max(
+      4,
+      Object.keys(this.room.state.players || {}).length
+    );
+
     // Define dungeon size in TILES, not pixels
-    const dungeonTileSize = Math.floor(100 + (playerCount * 5)); // e.g., 120 tiles for 4 players
-    
+    const dungeonTileSize = Math.floor(100 + playerCount * 5); // e.g., 120 tiles for 4 players
+
     // Create generator with tile-based dimensions and improved parameters
     this.generator = new EnhancedBSPGenerator({
       worldTileSize: this.worldTileWidth,
@@ -64,26 +72,48 @@ export class MapManager {
       maxLeafSize: 40, // Maximum leaf size for BSP in tiles
       playerCount: playerCount,
       tileSize: this.tileSize, // Pass tile size for later conversion
-      
+
       // Enhanced parameters from reference implementation
       containerSplitRetries: 30,
       containerMinimumRatio: 0.45,
       corridorWidth: 3,
       seed: `dungeon_${Date.now()}`,
-      debug: this.debug
+      debug: this.debug,
     });
-    
+
+    /**
+     * Example usage of new floor generator, but the generated data structure is completely
+     * different from the original dungeon generator. So we will need to adapt either the returned
+     * data or the change the client to use the new data structure.
+     * 
+     * This is currently not used at all, but it is a good example of how to use the new generator.
+     */
+    const testNewMapData = generate({
+      rooms: roomTemplates, // You'll provide this
+      mapWidth: 96,
+      mapHeight: 56,
+      mapGutterWidth: 1,
+      iterations: 5,
+      containerSplitRetries: 20,
+      containerMinimumRatio: 0.45,
+      containerMinimumSize: 4,
+      corridorWidth: 2,
+      seed: `dungeon_${Date.now()}`,
+    });
+
     // Generate dungeon with room templates
     this.currentMap = this.generator.generate(ROOM_TEMPLATES);
-    
-    console.log(`Generated floor ${this.floorLevel} with ${this.currentMap.rooms.length} rooms`);
-    
+
+    console.log(
+      `Generated floor ${this.floorLevel} with ${this.currentMap.rooms.length} rooms`
+    );
+
     // Send tile size with map data
     this.currentMap.tileSize = this.tileSize;
-    
+
     // Broadcast map to all clients
     this.broadcastMapData();
-    
+
     return this.currentMap;
   }
 
@@ -116,13 +146,13 @@ export class MapManager {
       maxLeafSize: Math.max(20, 40 - this.floorLevel * 2),
       playerCount: playerCount,
       tileSize: this.tileSize,
-      
+
       // Enhanced parameters
       containerSplitRetries: 20,
       containerMinimumRatio: 0.45,
       corridorWidth: 3,
       seed: `dungeon_floor_${this.floorLevel}_${Date.now()}`,
-      debug: this.debug
+      debug: this.debug,
     });
 
     // Generate dungeon with room templates
@@ -208,9 +238,9 @@ export class MapManager {
 
     // Prepare room templates if needed
     let templates = {};
-    
+
     // Check for template references in rooms
-    this.currentMap.rooms.forEach(room => {
+    this.currentMap.rooms.forEach((room) => {
       if (room.t) {
         const template = getTemplateById(room.t);
         if (template) {
@@ -230,7 +260,7 @@ export class MapManager {
       corridors: this.currentMap.corridors,
       spawnPoints: this.currentMap.spawnPoints,
       tileSize: this.tileSize,
-      templates: Object.keys(templates).length > 0 ? templates : undefined
+      templates: Object.keys(templates).length > 0 ? templates : undefined,
     };
 
     // Broadcast to all clients
@@ -238,7 +268,9 @@ export class MapManager {
 
     // Debug information
     if (this.debug) {
-      console.log(`Map data broadcast with ${mapData.rooms.length} rooms and ${mapData.corridors.length} corridors`);
+      console.log(
+        `Map data broadcast with ${mapData.rooms.length} rooms and ${mapData.corridors.length} corridors`
+      );
       console.log(`Included ${Object.keys(templates).length} room templates`);
     }
   }
@@ -252,45 +284,56 @@ export class MapManager {
     if (this.generator) {
       return this.generator.getSpawnPosition();
     }
-    
+
     // Default spawn at center if no map
-    if (!this.currentMap || !this.currentMap.spawnPoints || this.currentMap.spawnPoints.length === 0) {
+    if (
+      !this.currentMap ||
+      !this.currentMap.spawnPoints ||
+      this.currentMap.spawnPoints.length === 0
+    ) {
       console.warn("No spawn points available, using center of world");
-      return { 
-        x: this.worldTileWidth * this.tileSize / 2, 
-        y: this.worldTileHeight * this.tileSize / 2 
+      return {
+        x: (this.worldTileWidth * this.tileSize) / 2,
+        y: (this.worldTileHeight * this.tileSize) / 2,
       };
     }
-    
+
     // Find an unassigned spawn point
-    const unassignedSpawns = this.currentMap.spawnPoints.filter(spawn => !spawn.playerId);
-    
+    const unassignedSpawns = this.currentMap.spawnPoints.filter(
+      (spawn) => !spawn.playerId
+    );
+
     // If all spawns are assigned, pick a random one
-    const spawn = unassignedSpawns.length > 0 
-      ? unassignedSpawns[Math.floor(Math.random() * unassignedSpawns.length)]
-      : this.currentMap.spawnPoints[Math.floor(Math.random() * this.currentMap.spawnPoints.length)];
-    
+    const spawn =
+      unassignedSpawns.length > 0
+        ? unassignedSpawns[Math.floor(Math.random() * unassignedSpawns.length)]
+        : this.currentMap.spawnPoints[
+            Math.floor(Math.random() * this.currentMap.spawnPoints.length)
+          ];
+
     // Ensure spawn has valid coordinates
     if (isNaN(spawn.x) || isNaN(spawn.y)) {
       console.error("Invalid spawn point coordinates:", spawn);
-      return { 
-        x: this.worldTileWidth * this.tileSize / 2, 
-        y: this.worldTileHeight * this.tileSize / 2 
+      return {
+        x: (this.worldTileWidth * this.tileSize) / 2,
+        y: (this.worldTileHeight * this.tileSize) / 2,
       };
     }
-    
+
     // Convert to world coordinates
     const worldX = spawn.x * this.tileSize;
     const worldY = spawn.y * this.tileSize;
-    
-    console.log(`Assigning spawn point at tile (${spawn.x}, ${spawn.y}) => pixel (${worldX}, ${worldY})`);
-    
+
+    console.log(
+      `Assigning spawn point at tile (${spawn.x}, ${spawn.y}) => pixel (${worldX}, ${worldY})`
+    );
+
     // Mark this spawn as assigned
-    spawn.playerId = spawn.playerId || "pending"; 
-    
+    spawn.playerId = spawn.playerId || "pending";
+
     return {
       x: worldX,
-      y: worldY
+      y: worldY,
     };
   }
 
@@ -306,9 +349,9 @@ export class MapManager {
 
     // Prepare room templates if needed
     let templates = {};
-    
+
     // Check for template references in rooms
-    this.currentMap.rooms.forEach(room => {
+    this.currentMap.rooms.forEach((room) => {
       if (room.t) {
         const template = getTemplateById(room.t);
         if (template) {
@@ -328,7 +371,7 @@ export class MapManager {
       corridors: this.currentMap.corridors,
       spawnPoints: [...this.currentMap.spawnPoints],
       tileSize: this.tileSize,
-      templates: Object.keys(templates).length > 0 ? templates : undefined
+      templates: Object.keys(templates).length > 0 ? templates : undefined,
     };
 
     // Mark which spawn point belongs to this client
