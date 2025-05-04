@@ -1,12 +1,16 @@
-// server/systems/BSPDungeonGenerator.js
+// systems/EnhancedBSPGenerator.js
 
 /**
- * BSP Dungeon Generator
- * Creates dungeons using Binary Space Partitioning approach
+ * EnhancedBSPGenerator - A streamlined version of the BSP dungeon generator
+ * inspired by halftheopposite/bsp-dungeon-generator
  */
-export class BSPDungeonGenerator {
+export class EnhancedBSPGenerator {
+  /**
+   * Constructor with configuration options
+   * @param {Object} config - Configuration parameters
+   */
   constructor(config = {}) {
-    // Default configuration with extended parameters
+    // Default configuration with essential parameters
     this.config = {
       worldTileSize: config.worldTileSize || 312, // World size in tiles
       dungeonTileSize: config.dungeonTileSize || 100, // Dungeon size in tiles
@@ -20,30 +24,20 @@ export class BSPDungeonGenerator {
       maxLeafSize: config.maxLeafSize || 50, // Maximum leaf size for BSP in tiles
       splitVariance: config.splitVariance || 0.3, // How far from center splits can occur (0-0.5)
 
-      // New parameters - match the reference implementation
+      // Reference implementation parameters
       containerSplitRetries: config.containerSplitRetries || 10, // Number of retries for splitting
       containerMinimumRatio: config.containerMinimumRatio || 0.45, // Minimum width/height ratio
       mapGutterWidth: config.mapGutterWidth || 1, // Space at map edges
 
-      // Existing parameters
+      // Other parameters
       roomPadding: config.roomPadding || 1, // Space between rooms in tiles
       corridorWidth: config.corridorWidth || 3, // Width of corridors in tiles
-      seed: config.seed || Math.random().toString(36).substring(2, 15), // Random seed
+      seed: config.seed || String(Math.floor(Math.random() * 1000000)), // Random seed
       playerCount: config.playerCount || 4, // Number of players
       spawnRoomDistance: config.spawnRoomDistance || 40, // Distance from dungeon edge to spawn rooms in tiles
       tileSize: config.tileSize || 64, // Size of a tile in pixels
       debug: config.debug || false, // Debug mode
     };
-
-    // Scale dungeon size based on player count
-    if (config.playerCount) {
-      // Increase dungeon size by 20% for each player beyond 4
-      const scaleFactor = 1 + Math.max(0, config.playerCount - 4) * 0.2;
-      this.config.dungeonTileSize = Math.min(
-        this.config.worldTileSize - this.config.spawnRoomDistance * 2,
-        Math.round(this.config.dungeonTileSize * scaleFactor)
-      );
-    }
 
     // Internal state
     this.leaves = []; // BSP leaves
@@ -53,6 +47,11 @@ export class BSPDungeonGenerator {
 
     // Random generator
     this.random = this.createRandomGenerator(this.config.seed);
+
+    // Debug logging if enabled
+    if (this.config.debug) {
+      console.log("EnhancedBSPGenerator initialized with config:", this.config);
+    }
   }
 
   /**
@@ -61,7 +60,7 @@ export class BSPDungeonGenerator {
    * @returns {Function} - Random function that returns 0-1
    */
   createRandomGenerator(seed) {
-    // Create a local state based on seed hash
+    // Create a local state based on seed hash that won't affect Math.random
     let state = this.hashString(seed);
 
     // Return a function that generates random numbers
@@ -71,8 +70,8 @@ export class BSPDungeonGenerator {
       state ^= state >>> 17;
       state ^= state << 5;
 
-      // Convert to 0-1 range
-      return (state >>> 0) / 4294967296;
+      // Convert to 0-1 range (ensuring positive)
+      return ((state >>> 0) / 4294967296) % 1;
     };
   }
 
@@ -105,9 +104,10 @@ export class BSPDungeonGenerator {
 
   /**
    * Generate the complete dungeon
+   * @param {Object} roomTemplates - Optional room templates from RoomTemplates.js
    * @returns {Object} - Generated dungeon data
    */
-  generate() {
+  generate(roomTemplates = null) {
     console.time("dungeonGeneration");
 
     // Reset state
@@ -137,14 +137,14 @@ export class BSPDungeonGenerator {
     // Recursively split the dungeon area
     this.splitLeaves(rootLeaf);
 
-    // Create rooms in the leaves
-    this.createRooms();
+    // Create rooms in the leaves with templates
+    this.createRooms(roomTemplates);
 
     // Connect rooms with corridors
     this.createCorridors();
 
-    // Create spawn rooms around the outskirts
-    this.createSpawnRooms();
+    // Create spawn rooms around the outskirts with templates
+    this.createSpawnRooms(roomTemplates);
 
     console.timeEnd("dungeonGeneration");
 
@@ -154,13 +154,26 @@ export class BSPDungeonGenerator {
       );
     }
 
-    // Return dungeon data
+    // Create serializable versions of rooms (without circular references)
+    const serializableRooms = this.rooms.map((room) => {
+      // Create a copy of the room without the leaf reference
+      const { leaf, ...roomData } = room;
+      return roomData;
+    });
+
+    const serializableSpawnRooms = this.spawnRooms.map((room) => {
+      // Create a copy without any potential circular references
+      const { leaf, ...roomData } = room;
+      return roomData;
+    });
+
+    // Return dungeon data with serializable rooms
     return {
       worldTileWidth: this.config.worldTileSize,
       worldTileHeight: this.config.worldTileSize,
       dungeonTileWidth: this.config.dungeonTileSize,
       dungeonTileHeight: this.config.dungeonTileSize,
-      rooms: [...this.rooms, ...this.spawnRooms],
+      rooms: [...serializableRooms, ...serializableSpawnRooms],
       corridors: this.corridors,
       tileSize: this.config.tileSize,
       spawnPoints: this.spawnRooms.map((room) => {
@@ -170,8 +183,8 @@ export class BSPDungeonGenerator {
 
         return {
           roomId: room.id,
-          x: centerX, // Ensure this is a number
-          y: centerY, // Ensure this is a number
+          x: centerX,
+          y: centerY,
           playerId: room.playerId || null,
         };
       }),
@@ -237,8 +250,9 @@ export class BSPDungeonGenerator {
 
   /**
    * Create rooms inside the leaves
+   * @param {Object} roomTemplates - Room templates object from RoomTemplates.js
    */
-  createRooms() {
+  createRooms(roomTemplates = null) {
     // Process leaves that don't have children (end nodes)
     for (let i = 0; i < this.leaves.length; i++) {
       const leaf = this.leaves[i];
@@ -247,6 +261,14 @@ export class BSPDungeonGenerator {
       if (leaf.leftChild || leaf.rightChild) {
         continue;
       }
+
+      // Determine room type based on leaf size
+      const roomType = this.determineRoomType(leaf, this.leaves);
+
+      // Try to get a template for this room type
+      const template = roomTemplates
+        ? this.getTemplateForRoom(roomType, roomTemplates)
+        : null;
 
       // Determine room size and position
       let roomWidth, roomHeight, roomX, roomY;
@@ -283,17 +305,24 @@ export class BSPDungeonGenerator {
           leaf.height - roomHeight - this.config.roomPadding
         );
 
-      // Create room
+      // Create room WITHOUT storing a reference to the leaf (prevents circular reference)
       const room = {
         id: `room_${this.rooms.length}`,
-        leaf: leaf,
+        leafId: i, // Store index instead of direct reference
         x: roomX,
         y: roomY,
         width: roomWidth,
         height: roomHeight,
-        type: this.determineRoomType(leaf, this.leaves),
+        type: roomType,
         connections: [],
       };
+
+      // Apply template if available
+      if (template) {
+        room.layout = template.layout;
+        room.objects = template.objects;
+        room.t = template.id; // Store template ID for client-side rendering
+      }
 
       // Store room in leaf
       leaf.room = room;
@@ -301,6 +330,33 @@ export class BSPDungeonGenerator {
       // Add to rooms list
       this.rooms.push(room);
     }
+  }
+
+  /**
+   * Get a suitable template for a room
+   * @param {string} roomType - Type of room (small, medium, large, spawn)
+   * @param {Object} roomTemplates - Room templates object from RoomTemplates.js
+   * @returns {Object|null} - Selected template or null if none available
+   */
+  getTemplateForRoom(roomType, roomTemplates) {
+    // If no templates provided, return null
+    if (!roomTemplates || Object.keys(roomTemplates).length === 0) {
+      return null;
+    }
+
+    // Find templates matching the room type
+    const matchingTemplates = Object.values(roomTemplates).filter(
+      (template) => template.type === roomType
+    );
+
+    // If no matching templates, return null
+    if (matchingTemplates.length === 0) {
+      return null;
+    }
+
+    // Select a random template from matching ones
+    const templateIndex = Math.floor(this.random() * matchingTemplates.length);
+    return matchingTemplates[templateIndex];
   }
 
   /**
@@ -426,7 +482,7 @@ export class BSPDungeonGenerator {
   }
 
   /**
-   * Create a corridor between two rooms with improved variation
+   * Create a corridor between two rooms
    * @param {Object} roomA - First room
    * @param {Object} roomB - Second room
    */
@@ -442,21 +498,18 @@ export class BSPDungeonGenerator {
       y: Math.floor(roomB.y + roomB.height / 2),
     };
 
-    // Decide corridor type based on distance and randomness
+    // Choose corridor type based on distance and room layout
+    let corridorType = "L-shaped"; // Default to L-shaped
+
+    // For very close rooms, use straight corridors
     const dx = Math.abs(pointA.x - pointB.x);
     const dy = Math.abs(pointA.y - pointB.y);
-    const distance = dx + dy; // Manhattan distance
 
-    let corridorType;
-
-    if (distance < 10) {
-      // Short distance - prefer straight corridors
+    if (dx < 5 || dy < 5) {
       corridorType = "straight";
-    } else if (this.random() < 0.7) {
-      // Medium/long distance - prefer L-shaped
-      corridorType = "L-shaped";
-    } else {
-      // Sometimes use complex paths
+    }
+    // For distant rooms with a 10% chance, use complex corridors
+    else if (dx + dy > 50 && this.random() < 0.1) {
       corridorType = "complex";
     }
 
@@ -467,13 +520,11 @@ export class BSPDungeonGenerator {
       case "straight":
         corridor = this.createStraightCorridor(pointA, pointB);
         break;
-      case "L-shaped":
-        corridor = this.createLShapedCorridor(pointA, pointB);
-        break;
       case "complex":
         corridor = this.createComplexCorridor(pointA, pointB);
         break;
       default:
+        // L-shaped is the default
         corridor = this.createLShapedCorridor(pointA, pointB);
     }
 
@@ -489,12 +540,15 @@ export class BSPDungeonGenerator {
 
   /**
    * Create a straight corridor between points
+   * @param {Object} pointA - Start point
+   * @param {Object} pointB - End point
+   * @returns {Object} - Corridor data
    */
   createStraightCorridor(pointA, pointB) {
     return {
       id: `corridor_${this.corridors.length}`,
-      start: pointA,
-      end: pointB,
+      start: { x: pointA.x, y: pointA.y },
+      end: { x: pointB.x, y: pointB.y },
       width: this.config.corridorWidth,
       type: "straight",
     };
@@ -502,9 +556,12 @@ export class BSPDungeonGenerator {
 
   /**
    * Create an L-shaped corridor between points
+   * @param {Object} pointA - Start point
+   * @param {Object} pointB - End point
+   * @returns {Object} - Corridor data
    */
   createLShapedCorridor(pointA, pointB) {
-    // Choose a waypoint - either horizontal first, then vertical, or vice versa
+    // Choose waypoint - either horizontal first, then vertical, or vice versa
     let waypoint;
 
     if (this.random() < 0.5) {
@@ -515,8 +572,8 @@ export class BSPDungeonGenerator {
 
     return {
       id: `corridor_${this.corridors.length}`,
-      start: pointA,
-      end: pointB,
+      start: { x: pointA.x, y: pointA.y },
+      end: { x: pointB.x, y: pointB.y },
       waypoint: waypoint,
       width: this.config.corridorWidth,
       type: "L-shaped",
@@ -525,108 +582,72 @@ export class BSPDungeonGenerator {
 
   /**
    * Create a complex corridor with multiple segments
+   * @param {Object} pointA - Start point
+   * @param {Object} pointB - End point
+   * @returns {Object} - Corridor data
    */
   createComplexCorridor(pointA, pointB) {
-    // For a complex corridor, we'll create intermediate points
+    // Create a corridor that starts at pointA, makes two turns, and ends at pointB
+    // First create a point 1/3 of the way from A to B (with some randomness)
     const dx = pointB.x - pointA.x;
     const dy = pointB.y - pointA.y;
 
-    // Create two waypoints
+    // First waypoint - horizontal offset from point A
     const waypoint1 = {
-      x: pointA.x + Math.floor(dx * (0.3 + this.random() * 0.2)),
-      y: pointA.y + Math.floor(dy * (this.random() * 0.5)),
+      x: pointA.x + Math.floor(dx * 0.33 * (0.8 + this.random() * 0.4)),
+      y: pointA.y,
     };
 
+    // Second waypoint - vertical from waypoint1 to align with point B's y
     const waypoint2 = {
-      x: pointA.x + Math.floor(dx * (0.7 + this.random() * 0.2)),
-      y: pointA.y + Math.floor(dy * (0.5 + this.random() * 0.5)),
+      x: waypoint1.x,
+      y: pointB.y,
     };
 
-    // Create two segments
-    const segment1 = {
-      id: `corridor_${this.corridors.length}_1`,
-      start: pointA,
-      end: waypoint1,
+    return {
+      id: `corridor_${this.corridors.length}`,
+      start: { x: pointA.x, y: pointA.y },
+      end: { x: pointB.x, y: pointB.y },
+      waypoints: [waypoint1, waypoint2],
       width: this.config.corridorWidth,
-      type: "complex_segment",
+      type: "complex",
     };
-
-    const segment2 = {
-      id: `corridor_${this.corridors.length}_2`,
-      start: waypoint1,
-      end: waypoint2,
-      width: this.config.corridorWidth,
-      type: "complex_segment",
-    };
-
-    const segment3 = {
-      id: `corridor_${this.corridors.length}_3`,
-      start: waypoint2,
-      end: pointB,
-      width: this.config.corridorWidth,
-      type: "complex_segment",
-    };
-
-    // Add intermediate segments to corridors list
-    this.corridors.push(segment1);
-    this.corridors.push(segment2);
-
-    // Return the last segment
-    return segment3;
   }
 
   /**
    * Add extra corridors for better connectivity
    */
   addExtraCorridors() {
-    // Calculate a reasonable number of extra corridors based on room count
-    const extraCorridorCount = Math.floor(this.rooms.length * 0.2); // 20% of room count
+    // Add 10% more corridors for better connectivity
+    const extraCorridors = Math.ceil(this.rooms.length * 0.1);
 
-    for (let i = 0; i < extraCorridorCount; i++) {
+    for (let i = 0; i < extraCorridors; i++) {
       // Pick two random rooms
-      const roomIndexA = Math.floor(this.random() * this.rooms.length);
-      let roomIndexB;
+      const roomA = this.rooms[this.randomInt(0, this.rooms.length - 1)];
+      let roomB;
 
-      // Make sure we pick different rooms
+      // Find a room that isn't already connected to roomA
+      let attempts = 0;
       do {
-        roomIndexB = Math.floor(this.random() * this.rooms.length);
-      } while (roomIndexB === roomIndexA);
+        roomB = this.rooms[this.randomInt(0, this.rooms.length - 1)];
+        attempts++;
 
-      const roomA = this.rooms[roomIndexA];
-      const roomB = this.rooms[roomIndexB];
+        // Break if we can't find a suitable room after many attempts
+        if (attempts > 50) break;
+      } while (roomA === roomB || roomA.connections.includes(roomB.id));
 
-      // Skip if they're already directly connected
-      if (roomA.connections.includes(roomB.id)) {
-        continue;
-      }
-
-      // Create a corridor with 50% chance of complex type
-      if (this.random() < 0.5) {
-        const pointA = {
-          x: Math.floor(roomA.x + roomA.width / 2),
-          y: Math.floor(roomA.y + roomA.height / 2),
-        };
-
-        const pointB = {
-          x: Math.floor(roomB.x + roomB.width / 2),
-          y: Math.floor(roomB.y + roomB.height / 2),
-        };
-
-        this.corridors.push(this.createComplexCorridor(pointA, pointB));
-      } else {
+      // If we found a valid room, connect them
+      if (roomA !== roomB && !roomA.connections.includes(roomB.id)) {
         this.createCorridor(roomA, roomB);
       }
-
-      // Mark rooms as connected
-      roomA.connections.push(roomB.id);
-      roomB.connections.push(roomA.id);
     }
   }
 
   /**
    * Create spawn rooms around the dungeon outskirts
+   * @param {Object} roomTemplates - Room templates object from RoomTemplates.js
    */
-  createSpawnRooms() {
+  createSpawnRooms(roomTemplates = null) {
     // Get number of spawn rooms needed (one per player)
     const spawnCount = this.config.playerCount;
 
@@ -639,9 +660,16 @@ export class BSPDungeonGenerator {
       Math.floor(this.config.dungeonTileSize / 2) +
       this.config.spawnRoomDistance;
 
-    console.log(
-      `Creating ${spawnCount} spawn rooms at radius ${spawnRadius} tiles from center (${dungeonCenterX}, ${dungeonCenterY})`
-    );
+    if (this.config.debug) {
+      console.log(
+        `Creating ${spawnCount} spawn rooms at radius ${spawnRadius} tiles from center (${dungeonCenterX}, ${dungeonCenterY})`
+      );
+    }
+
+    // Try to get a spawn room template
+    const spawnTemplate = roomTemplates
+      ? this.getTemplateForRoom("spawn", roomTemplates)
+      : null;
 
     for (let i = 0; i < spawnCount; i++) {
       // Calculate angle for even distribution around the dungeon
@@ -652,15 +680,17 @@ export class BSPDungeonGenerator {
       const spawnY = Math.floor(dungeonCenterY + Math.sin(angle) * spawnRadius);
 
       // Create spawn room (consistent size)
-      const spawnRoomSize = 10; // Fixed size for spawn rooms in tiles
+      const spawnRoomSize = spawnTemplate ? spawnTemplate.width : 10; // Use template size or default to 10
 
       // Calculate top-left corner of room
       const roomX = spawnX - Math.floor(spawnRoomSize / 2);
       const roomY = spawnY - Math.floor(spawnRoomSize / 2);
 
-      console.log(
-        `Spawn room ${i} at position (${roomX}, ${roomY}) with size ${spawnRoomSize}x${spawnRoomSize}`
-      );
+      if (this.config.debug) {
+        console.log(
+          `Spawn room ${i} at position (${roomX}, ${roomY}) with size ${spawnRoomSize}x${spawnRoomSize}`
+        );
+      }
 
       const spawnRoom = {
         id: `spawn_${i}`,
@@ -673,6 +703,13 @@ export class BSPDungeonGenerator {
         playerId: null, // Will be assigned later
         connections: [],
       };
+
+      // Apply template if available
+      if (spawnTemplate) {
+        spawnRoom.layout = spawnTemplate.layout;
+        spawnRoom.objects = spawnTemplate.objects;
+        spawnRoom.t = spawnTemplate.id; // Store template ID for client-side rendering
+      }
 
       // Add to spawn rooms list
       this.spawnRooms.push(spawnRoom);
@@ -719,6 +756,61 @@ export class BSPDungeonGenerator {
       // Mark corridor as a spawn corridor for visual distinction
       corridor.isSpawnCorridor = true;
     }
+  }
+
+  /**
+   * Get spawn position for a new player
+   * @returns {Object} - Spawn position {x, y}
+   */
+  getSpawnPosition() {
+    // Default spawn at center if no map
+    if (!this.spawnRooms || this.spawnRooms.length === 0) {
+      console.warn("No spawn points available, using center of world");
+      return {
+        x: (this.config.worldTileSize * this.config.tileSize) / 2,
+        y: (this.config.worldTileSize * this.config.tileSize) / 2,
+      };
+    }
+
+    // Find an unassigned spawn point
+    const unassignedSpawns = this.spawnRooms.filter((spawn) => !spawn.playerId);
+
+    // If all spawns are assigned, pick a random one
+    const spawn =
+      unassignedSpawns.length > 0
+        ? unassignedSpawns[Math.floor(this.random() * unassignedSpawns.length)]
+        : this.spawnRooms[Math.floor(this.random() * this.spawnRooms.length)];
+
+    // Ensure spawn has valid coordinates
+    if (isNaN(spawn.x) || isNaN(spawn.y)) {
+      console.error("Invalid spawn point coordinates:", spawn);
+      return {
+        x: (this.config.worldTileSize * this.config.tileSize) / 2,
+        y: (this.config.worldTileSize * this.config.tileSize) / 2,
+      };
+    }
+
+    // Calculate center of spawn room in pixel coordinates
+    const centerX = Math.floor(spawn.x + spawn.width / 2);
+    const centerY = Math.floor(spawn.y + spawn.height / 2);
+
+    // Convert to world coordinates in pixels
+    const worldX = centerX * this.config.tileSize;
+    const worldY = centerY * this.config.tileSize;
+
+    if (this.config.debug) {
+      console.log(
+        `Assigning spawn point at tile (${centerX}, ${centerY}) => pixel (${worldX}, ${worldY})`
+      );
+    }
+
+    // Mark this spawn as assigned
+    spawn.playerId = spawn.playerId || "pending";
+
+    return {
+      x: worldX,
+      y: worldY,
+    };
   }
 }
 
