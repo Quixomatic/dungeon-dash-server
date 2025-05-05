@@ -1,4 +1,4 @@
-// server/rooms/NormalGameRoom.js
+// server/rooms/NormalGameRoom.js - Updated for new dungeon generator
 import { BaseRoom } from "./BaseRoom.js";
 import { GameRoomState } from "../schemas/GameRoomState.js";
 import { PlayerState } from "../schemas/PlayerState.js";
@@ -56,7 +56,7 @@ export class NormalGameRoom extends BaseRoom {
     // Generate initial map
     console.log("Generating initial dungeon floor...");
     const initialMap = this.mapManager.generateFirstFloor();
-    console.log(`Initial floor generated with ${initialMap.rooms.length} rooms and ${initialMap.spawnPoints.length} spawn points`);
+    console.log(`Initial floor generated with ${initialMap.layers.tiles.length}x${initialMap.layers.tiles[0].length} tiles`);
     
     // Set initial phase
     this.phaseManager.setPhase("lobby");
@@ -195,6 +195,7 @@ export class NormalGameRoom extends BaseRoom {
       });
     });
 
+    // Map loaded confirmation handler
     this.onMessage("mapLoaded", (client) => {
       const player = this.state.players.get(client.id);
       if (player) {
@@ -205,6 +206,124 @@ export class NormalGameRoom extends BaseRoom {
         this.checkAllPlayersMapLoaded();
       }
     });
+    
+    // Handle collision reports from clients (optional)
+    this.onMessage("collision", (client, message) => {
+      // This can be used to verify client-reported collisions
+      // For now, just log it
+      if (this.state.players.get(client.id)) {
+        console.log(`Collision reported by ${client.id} at (${message.x}, ${message.y})`);
+      }
+    });
+    
+    // Handle interaction with objects (e.g. chests, triggers)
+    this.onMessage("interaction", (client, message) => {
+      const player = this.state.players.get(client.id);
+      if (!player) return;
+      
+      console.log(`Player ${player.name} interacted with ${message.type} at tile (${message.tileX}, ${message.tileY})`);
+      
+      // Handle different interaction types
+      switch (message.type) {
+        case "chest":
+          // Give player an item/reward
+          this.handleChestInteraction(client, player, message);
+          break;
+          
+        case "door":
+          // Open/close door
+          this.handleDoorInteraction(client, player, message);
+          break;
+          
+        case "portal":
+          // Teleport player
+          this.handlePortalInteraction(client, player, message);
+          break;
+          
+        default:
+          // Unknown interaction type
+          console.warn(`Unknown interaction type: ${message.type}`);
+      }
+    });
+  }
+
+  /**
+   * Handle player interaction with a chest
+   * @param {Client} client - Client object
+   * @param {PlayerState} player - Player state
+   * @param {Object} message - Interaction message
+   */
+  handleChestInteraction(client, player, message) {
+    // Check if chest exists at specified location
+    if (this.mapManager && this.mapManager.currentMap && this.mapManager.currentMap.layers) {
+      const { tileX, tileY } = message;
+      const props = this.mapManager.currentMap.layers.props;
+      
+      // Check if there's a chest at this position (prop value 3 = chest)
+      if (props && props[tileY] && props[tileY][tileX] === 3) {
+        // Give player a reward
+        // For now, just notify the player
+        client.send("itemFound", {
+          type: "gold",
+          amount: Math.floor(10 + Math.random() * 20)
+        });
+        
+        // Mark chest as opened by setting it to 0 (empty)
+        props[tileY][tileX] = 0;
+        
+        // Notify all clients about chest being opened
+        this.broadcast("propsUpdated", {
+          updates: [{ x: tileX, y: tileY, value: 0 }]
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle player interaction with a door
+   * @param {Client} client - Client object
+   * @param {PlayerState} player - Player state
+   * @param {Object} message - Interaction message
+   */
+  handleDoorInteraction(client, player, message) {
+    // Implementation will depend on how doors are represented
+    // For now, just acknowledge the interaction
+    client.send("doorToggled", {
+      x: message.tileX,
+      y: message.tileY,
+      isOpen: true
+    });
+  }
+
+  /**
+   * Handle player interaction with a portal
+   * @param {Client} client - Client object
+   * @param {PlayerState} player - Player state
+   * @param {Object} message - Interaction message
+   */
+  handlePortalInteraction(client, player, message) {
+    // Teleport player to a different location
+    // For demonstration, just move them 10 tiles away
+    const newX = player.position.x + 10 * this.mapManager.tileSize;
+    const newY = player.position.y + 10 * this.mapManager.tileSize;
+    
+    // Update player position
+    player.position.x = newX;
+    player.position.y = newY;
+    
+    // Notify the player
+    client.send("teleported", {
+      x: newX,
+      y: newY,
+      message: "You've been teleported!"
+    });
+    
+    // Notify other players
+    this.broadcast("playerMoved", {
+      id: player.id,
+      x: newX,
+      y: newY
+    }, { except: client });
   }
 
   checkAllPlayersMapLoaded() {
@@ -236,6 +355,46 @@ export class NormalGameRoom extends BaseRoom {
     if (this.state.gameStarted && Math.random() < deltaTime / (120 * 1000)) {
       this.eventManager.triggerGlobalEvent();
     }
+    
+    // Specific updates for the dungeon phase
+    if (this.state.phase === this.phaseManager.PHASES.DUNGEON) {
+      this.updateDungeonPhase(deltaTime);
+    }
+    
+    // Specific updates for the gauntlet phase
+    if (this.state.phase === this.phaseManager.PHASES.GAUNTLET) {
+      this.updateGauntletPhase(deltaTime);
+    }
+  }
+  
+  /**
+   * Special updates for dungeon phase
+   * @param {number} deltaTime - Time since last update in ms
+   */
+  updateDungeonPhase(deltaTime) {
+    // Handle floor collapse warning
+    if (this.state.phaseEndTime) {
+      const timeLeft = Math.ceil((this.state.phaseEndTime - Date.now()) / 1000);
+      
+      // Send warnings at 60, 30, 20, 10, and every second under 10
+      if (timeLeft === 60 || timeLeft === 30 || timeLeft === 20 || 
+          timeLeft === 10 || (timeLeft < 10 && timeLeft > 0)) {
+        
+        this.broadcast("floorCollapsing", { timeLeft });
+      }
+    }
+    
+    // Spawn monsters or handle other dungeon-specific logic
+    // ...
+  }
+  
+  /**
+   * Special updates for gauntlet phase
+   * @param {number} deltaTime - Time since last update in ms
+   */
+  updateGauntletPhase(deltaTime) {
+    // Handle gauntlet-specific logic
+    // ...
   }
   
   onDispose() {
