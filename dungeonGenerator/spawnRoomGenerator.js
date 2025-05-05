@@ -1,6 +1,6 @@
 // server/dungeonGenerator/spawnRoomGenerator.js
 
-import { TreeNode, Container, Room, Point } from './types.js';
+import { TreeNode, Container, Room, Point, Corridor } from './types.js';
 import { random, randomChoice } from './utils.js';
 
 /**
@@ -41,18 +41,22 @@ export function addSpawnRooms(dungeonData, options = {}) {
     centerX + dungeonOffsetX,
     centerY + dungeonOffsetY,
     spawnRadius,
+    options.gutterWidth || 20, // Pass the gutter width from mapGutterWidth
     spawnRoomSize,
     templates
   );
   
-  // Add spawn rooms to tree as new leaves
-  const expandedTree = addSpawnNodesToTree(tree, spawnRooms);
-  
   // Expand all layers to accommodate spawn rooms
   const expandedLayers = expandLayers(layers, width, height, expandedWidth, expandedHeight, dungeonOffsetX, dungeonOffsetY);
   
+  // Connect spawn rooms to nearest dungeon room with corridors
+  connectSpawnRoomsToMap(spawnRooms, tree, expandedLayers.tiles);
+  
   // Add spawn rooms to the layers
   addSpawnRoomsToLayers(expandedLayers, spawnRooms, templates);
+  
+  // Add spawn rooms to tree as new leaves
+  const expandedTree = addSpawnNodesToTree(tree, spawnRooms);
   
   // Return expanded dungeon data
   return {
@@ -86,7 +90,7 @@ export function addSpawnRooms(dungeonData, options = {}) {
  * @param {Array} templates - Optional room templates to use
  * @returns {Array} - Array of spawn room containers
  */
-function createSpawnRooms(count, centerX, centerY, radius, size, templates) {
+function createSpawnRooms(count, centerX, centerY, radius, gutterWidth, size, templates) {
   const spawnRooms = [];
   
   // When using templates, find spawn room templates
@@ -103,8 +107,12 @@ function createSpawnRooms(count, centerX, centerY, radius, size, templates) {
     // Calculate angle for even distribution
     const angle = (i / count) * Math.PI * 2;
     
+    // Calculate position within the gutter zone
+    // The radius should be the dungeon radius minus a small buffer (e.g., half the gutter width)
+    const spawnRadius = radius - (gutterWidth / 2);
+    
     // Add some randomness to the radius (±10%)
-    const randomRadius = radius * (0.9 + 0.2 * Math.random());
+    const randomRadius = spawnRadius * (0.9 + 0.2 * Math.random());
     
     // Calculate position on the circle
     const spawnX = Math.floor(centerX + Math.cos(angle) * randomRadius) - Math.floor(roomWidth / 2);
@@ -149,6 +157,221 @@ function createSpawnRooms(count, centerX, centerY, radius, size, templates) {
   }
   
   return spawnRooms;
+}
+
+/**
+ * Add corridors from spawn rooms to the main dungeon
+ * @param {Array} spawnRooms - Spawn room containers
+ * @param {TreeNode} dungeonTree - Main dungeon tree
+ * @param {Array} dungeonTiles - Dungeon tiles layer
+ * @returns {Array} - Array of corridors created
+ */
+function connectSpawnRoomsToMap(spawnRooms, dungeonTree, dungeonTiles) {
+  const corridors = [];
+  
+  // Get all rooms from the dungeon tree
+  const dungeonRooms = dungeonTree.leaves
+    .filter(container => container.room !== null)
+    .map(container => container.room);
+  
+  if (dungeonRooms.length === 0) {
+    console.error("No dungeon rooms found to connect to spawn rooms");
+    return corridors;
+  }
+  
+  // For each spawn room, connect to the nearest dungeon room
+  spawnRooms.forEach((spawnContainer, index) => {
+    const spawnRoom = spawnContainer.room;
+    
+    // Find the nearest room
+    let nearestRoom = null;
+    let nearestDistance = Infinity;
+    
+    dungeonRooms.forEach(room => {
+      // Calculate distance between room centers
+      const dx = (room.x + room.width/2) - (spawnRoom.x + spawnRoom.width/2);
+      const dy = (room.y + room.height/2) - (spawnRoom.y + spawnRoom.height/2);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < nearestDistance) {
+        nearestRoom = room;
+        nearestDistance = distance;
+      }
+    });
+    
+    if (!nearestRoom) {
+      console.error(`No nearest room found for spawn room ${index}`);
+      return;
+    }
+    
+    // Simply carve a direct corridor in each direction
+    // This approach guarantees connection without complex calculations
+    
+    // Corridor width
+    const corridorWidth = 4;
+    
+    // Get room centers
+    const spawnCenterX = Math.floor(spawnRoom.x + spawnRoom.width/2);
+    const spawnCenterY = Math.floor(spawnRoom.y + spawnRoom.height/2);
+    const roomCenterX = Math.floor(nearestRoom.x + nearestRoom.width/2);
+    const roomCenterY = Math.floor(nearestRoom.y + nearestRoom.height/2);
+    
+    // Create a horizontal corridor spanning the entire distance between rooms
+    const horizontalCorridor = {
+      x: Math.min(spawnCenterX, roomCenterX),
+      y: spawnCenterY - Math.floor(corridorWidth/2),
+      width: Math.abs(roomCenterX - spawnCenterX) + corridorWidth,
+      height: corridorWidth
+    };
+    
+    // Create a vertical corridor spanning the entire distance between rooms
+    const verticalCorridor = {
+      x: roomCenterX - Math.floor(corridorWidth/2),
+      y: Math.min(spawnCenterY, roomCenterY),
+      width: corridorWidth,
+      height: Math.abs(roomCenterY - spawnCenterY) + corridorWidth
+    };
+    
+    // Carve both corridors - one will be horizontal, one vertical, creating an L shape
+    [horizontalCorridor, verticalCorridor].forEach(corridor => {
+      for (let y = corridor.y; y < corridor.y + corridor.height; y++) {
+        if (y < 0 || y >= dungeonTiles.length) continue;
+        
+        for (let x = corridor.x; x < corridor.x + corridor.width; x++) {
+          if (x < 0 || x >= dungeonTiles[y].length) continue;
+          
+          // Set to floor (0)
+          dungeonTiles[y][x] = 0;
+        }
+      }
+      
+      // Add to corridor list
+      corridors.push(new Corridor(
+        corridor.x,
+        corridor.y,
+        corridor.width,
+        corridor.height
+      ));
+    });
+    
+    // Store in spawn room
+    spawnContainer.corridors = [
+      new Corridor(
+        horizontalCorridor.x,
+        horizontalCorridor.y,
+        horizontalCorridor.width,
+        horizontalCorridor.height
+      ),
+      new Corridor(
+        verticalCorridor.x,
+        verticalCorridor.y,
+        verticalCorridor.width,
+        verticalCorridor.height
+      )
+    ];
+    
+    console.log(`Created corridor from spawn ${index} to nearest room:`, {
+      spawnRoom: { x: spawnRoom.x, y: spawnRoom.y, w: spawnRoom.width, h: spawnRoom.height },
+      nearestRoom: { x: nearestRoom.x, y: nearestRoom.y, w: nearestRoom.width, h: nearestRoom.height },
+      horizontalCorridor,
+      verticalCorridor
+    });
+  });
+  
+  return corridors;
+}
+
+/**
+ * Plot a line using Bresenham's algorithm
+ * @param {number} x0 - Start X
+ * @param {number} y0 - Start Y
+ * @param {number} x1 - End X
+ * @param {number} y1 - End Y
+ * @returns {Array} - Array of points on the line
+ */
+function plotLine(x0, y0, x1, y1) {
+  const points = [];
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  
+  let x = x0;
+  let y = y0;
+  
+  while (true) {
+    points.push({ x, y });
+    
+    if (x === x1 && y === y1) break;
+    
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+  
+  return points;
+}
+
+/**
+ * Carve a path with a specific width into the dungeon tiles
+ * @param {Array} path - Array of path points
+ * @param {Array} tiles - Tiles layer
+ * @param {number} width - Width of the corridor
+ */
+function carvePathWithWidth(path, tiles, width) {
+  // Skip if tiles or path is invalid
+  if (!tiles || !tiles.length || !path || !path.length) return;
+  
+  // Calculate half width (rounded down)
+  const halfWidth = Math.floor(width / 2);
+  
+  // Carve tiles along the path with the specified width
+  path.forEach(point => {
+    // Carve tiles in a square around the path point
+    for (let y = point.y - halfWidth; y <= point.y + halfWidth; y++) {
+      // Skip if y is out of bounds
+      if (y < 0 || y >= tiles.length) continue;
+      
+      for (let x = point.x - halfWidth; x <= point.x + halfWidth; x++) {
+        // Skip if x is out of bounds
+        if (x < 0 || x >= tiles[y].length) continue;
+        
+        // Set tile to floor (0)
+        tiles[y][x] = 0;
+      }
+    }
+  });
+}
+
+/**
+ * Carve a corridor into the tiles layer
+ * @param {Corridor} corridor - Corridor to carve
+ * @param {Array} tiles - Tiles layer
+ */
+function carveCorridorIntoTiles(corridor, tiles) {
+  // Make sure tiles exists
+  if (!tiles || !tiles.length) return;
+  
+  // Carve the corridor into the tiles
+  for (let y = corridor.y; y < corridor.y + corridor.height; y++) {
+    // Skip if y is out of bounds
+    if (y < 0 || y >= tiles.length) continue;
+    
+    for (let x = corridor.x; x < corridor.x + corridor.width; x++) {
+      // Skip if x is out of bounds
+      if (x < 0 || x >= tiles[y].length) continue;
+      
+      // Set tile to floor (0)
+      tiles[y][x] = 0;
+    }
+  }
 }
 
 /**

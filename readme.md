@@ -136,6 +136,9 @@ dungeon-dash-royale/
 - [x] Procedural dungeon generation
 - [x] Spawn point allocation
 - [x] Map data synchronization
+- [x] Expanded map size for more exploration
+- [x] Improved generator configuration parameters
+- [x] Spawn rooms in gutter zone (but not fully connected yet)
 
 ### Client Features
 - [x] Lobby scene with connection UI
@@ -147,6 +150,8 @@ dungeon-dash-royale/
 - [x] Smooth remote player movement
 - [x] Server-determined player spawn positions
 - [x] Efficient dungeon rendering with culling
+- [x] Fixed culling issues for proper room rendering
+- [x] Enhanced visual wall representations based on connection type
 - [x] Minimap for navigation
 - [x] Map loading synchronization
 - [x] Adaptive tile size handling
@@ -155,25 +160,26 @@ dungeon-dash-royale/
 ## 🚀 Next Steps
 
 ### Immediate Priorities
-1. **Finalize Dungeon Rendering**
-   - Ensure corridors are properly rendered
-   - Implement collision detection with dungeon walls
-   - Fix any remaining tile rendering issues
+1. **Fix Spawn Room Connections**
+   - Fix the current issue with spawn room corridors not properly connecting to the main dungeon
+   - Create reliable paths from spawn rooms to the nearest dungeon room
+   - Ensure corridors are properly carved into the tile map
 
-2. **Enhance Dungeon Generation**
-   - Add more room templates
-   - Add environmental obstacles
+2. **Improve Minimap Functionality**
+   - Fix positioning offset in the minimap container
+   - Implement minimap zoom to show less of the map for better navigation
+   - Add minimap panning that follows player movement
+   - Consider adding a "fog of war" effect to only show explored areas
+
+3. **Enhance Dungeon Generation**
+   - Continue refining room templates
+   - Add more environmental obstacles
    - Add collectibles and items
 
-3. **Create Item and Ability System**
+4. **Create Item and Ability System**
    - Define item types and effects
    - Implement player inventory
    - Create ability activation logic
-
-4. **Build Combat System**
-   - Implement attack mechanics
-   - Create health and damage calculations
-   - Add visual effects for combat
 
 ### Medium-Term Goals
 1. **Add Progression Systems**
@@ -246,6 +252,9 @@ We've implemented a centralized GameState system that acts as a single source of
 - Custom room templates with different types (standard, spawn, etc.)
 - Efficient dungeon rendering with tile culling
 - L-shaped corridors connecting rooms
+- Enhanced rendering with different wall types based on connections
+- Expanded map size for more exploration (doubled dimensions)
+- Improved generator configuration with more iterations and wider corridors
 
 ### Fixed Tick Rate System
 - Server runs at 60Hz (16.67ms)
@@ -267,6 +276,19 @@ We've implemented a centralized GameState system that acts as a single source of
 - Add new players: `gameState.addPlayer(id, playerData)`
 - Remove players: `gameState.removePlayer(id)`
 - Access map data: `gameState.getMapData()`
+
+### Recent Improvements
+- Fixed rendering culling system to properly show all room and corridor tiles
+- Enhanced the visual representation of walls with textures based on their connection types
+- Doubled dungeon size for more exploration space
+- Improved generator configuration for better room layout and wider corridors
+- Added spawn rooms in gutter zone, still need to fix their connections to the main dungeon
+- Enhanced wall rendering based on wall connection patterns
+
+### Known Issues
+- Spawn room corridors are not being properly computed and carved into the map
+- Minimap container is positioned correctly, but its content appears offset
+- Minimap should be zoomed in more and pan with player movement
 
 ## 🔧 Developer Setup
 

@@ -57,14 +57,14 @@ export class MapManager {
       Object.keys(this.room.state.players || {}).length
     );
 
-    // Define dungeon size in TILES, not pixels
-    const dungeonSize = Math.floor(100 + playerCount * 5); // e.g., 120 tiles for 4 players
+    // DOUBLED: Define dungeon size in TILES, not pixels
+    const dungeonSize = Math.floor(200 + playerCount * 10); // Doubled from (100 + playerCount * 5)
 
     // Generate the dungeon with the new generator
     const dungeonData = this.generateDungeon({
       playerCount,
       dungeonSize,
-      floorLevel: this.floorLevel
+      floorLevel: this.floorLevel,
     });
 
     // Convert to the format expected by client
@@ -94,17 +94,17 @@ export class MapManager {
       Object.keys(this.room.state.players || {}).length
     );
 
-    // Calculate dungeon size - smaller on higher floors
+    // DOUBLED: Calculate dungeon size - smaller on higher floors
     const dungeonSize = Math.max(
-      50, // Minimum size in tiles
-      100 + playerCount * 5 - this.floorLevel * 5 // Shrink with each floor
+      100, // Minimum size in tiles (doubled from 50)
+      200 + playerCount * 10 - this.floorLevel * 10 // Doubled from (100 + playerCount * 5 - this.floorLevel * 5)
     );
 
     // Generate the dungeon with the new generator
     const dungeonData = this.generateDungeon({
       playerCount,
       dungeonSize,
-      floorLevel: this.floorLevel
+      floorLevel: this.floorLevel,
     });
 
     // Convert to the format expected by client
@@ -129,24 +129,20 @@ export class MapManager {
    * @returns {Object} - Generated dungeon data
    */
   generateDungeon(options) {
-    const {
-      playerCount = 4,
-      dungeonSize = 100,
-      floorLevel = 1
-    } = options;
+    const { playerCount = 4, dungeonSize = 100, floorLevel = 1 } = options;
 
     // Configure parameters for the generator
     const generatorConfig = {
       rooms: roomTemplates,
       mapWidth: dungeonSize,
       mapHeight: dungeonSize,
-      mapGutterWidth: 1,
-      iterations: Math.max(3, Math.min(5, Math.floor(dungeonSize / 20))),
-      containerSplitRetries: 20,
+      mapGutterWidth: 10,
+      iterations: 6,//Math.max(3, Math.min(6, Math.floor(dungeonSize / 20))),
+      containerSplitRetries: 30,
       containerMinimumRatio: 0.45,
       containerMinimumSize: 4,
-      corridorWidth: 2,
-      seed: `dungeon_floor_${floorLevel}_${Date.now()}`
+      corridorWidth: 4,
+      seed: `dungeon_floor_${floorLevel}_${Date.now()}`,
     };
 
     // Generate the basic dungeon
@@ -154,7 +150,9 @@ export class MapManager {
     const dungeonData = generate(generatorConfig);
 
     if (this.debug) {
-      console.log(`Base dungeon generated with size ${dungeonSize}x${dungeonSize}`);
+      console.log(
+        `Base dungeon generated with size ${dungeonSize}x${dungeonSize}`
+      );
     }
 
     // Add spawn rooms around the dungeon
@@ -162,14 +160,17 @@ export class MapManager {
       playerCount,
       bufferDistance: 8,
       spawnRoomSize: 6,
-      templates: roomTemplates
+      templates: roomTemplates,
+      gutterWidth: generatorConfig.mapGutterWidth // Pass the gutter width
     };
 
     const expandedDungeon = addSpawnRooms(dungeonData, spawnRoomConfig);
 
     if (this.debug) {
       console.log(`Added ${playerCount} spawn rooms to dungeon`);
-      console.log(`Expanded size: ${expandedDungeon.width}x${expandedDungeon.height}`);
+      console.log(
+        `Expanded size: ${expandedDungeon.width}x${expandedDungeon.height}`
+      );
     }
 
     return expandedDungeon;
@@ -182,11 +183,11 @@ export class MapManager {
    */
   prepareMapDataForClient(dungeonData) {
     // Extract spawn points from the dungeon data
-    const spawnPoints = (dungeonData.spawnRooms || []).map(room => ({
+    const spawnPoints = (dungeonData.spawnRooms || []).map((room) => ({
       roomId: room.id,
       x: room.center ? room.center.x : room.x + Math.floor(room.width / 2),
       y: room.center ? room.center.y : room.y + Math.floor(room.height / 2),
-      playerId: null
+      playerId: null,
     }));
 
     // Return a format that includes both raw layer data and higher-level info
@@ -194,34 +195,34 @@ export class MapManager {
       // World dimensions in tiles
       worldTileWidth: this.worldTileWidth,
       worldTileHeight: this.worldTileHeight,
-      
+
       // Dungeon dimensions
       dungeonTileWidth: dungeonData.width,
       dungeonTileHeight: dungeonData.height,
-      
+
       // Floor info
       floorLevel: this.floorLevel,
-      
+
       // Tile size
       tileSize: this.tileSize,
-      
+
       // Spawn information
       spawnPoints,
-      
+
       // Include the raw layer data
       layers: dungeonData.layers,
-      
+
       // Add a reference to the tree structure if needed
       // tree: dungeonData.tree, // Only include if client needs it
-      
+
       // Additional metadata that might be useful
       offset: {
         x: dungeonData.dungeonOffsetX || 0,
-        y: dungeonData.dungeonOffsetY || 0
+        y: dungeonData.dungeonOffsetY || 0,
       },
-      
+
       // Store a unique map ID for reference
-      id: `floor_${this.floorLevel}_${Date.now()}`
+      id: `floor_${this.floorLevel}_${Date.now()}`,
     };
   }
 
@@ -295,10 +296,10 @@ export class MapManager {
 
     // Debug information
     if (this.debug) {
+      console.log(`Map data broadcast for floor ${this.currentMap.floorLevel}`);
       console.log(
-        `Map data broadcast for floor ${this.currentMap.floorLevel}`
+        `Dungeon size: ${this.currentMap.dungeonTileWidth}x${this.currentMap.dungeonTileHeight}`
       );
-      console.log(`Dungeon size: ${this.currentMap.dungeonTileWidth}x${this.currentMap.dungeonTileHeight}`);
       console.log(`Spawn points: ${this.currentMap.spawnPoints.length}`);
     }
   }
@@ -372,7 +373,7 @@ export class MapManager {
 
     // Clone map data
     const mapData = { ...this.currentMap };
-    
+
     // Make a deep copy of spawn points
     mapData.spawnPoints = [...this.currentMap.spawnPoints];
 
