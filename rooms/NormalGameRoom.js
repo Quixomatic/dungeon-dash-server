@@ -43,7 +43,7 @@ export class NormalGameRoom extends BaseRoom {
     this.inputHandler = new InputHandler(this);
     this.phaseManager = new PhaseManager(this);
     this.eventManager = new EventManager(this);
-    this.collisionSystem = new CollisionSystem(this);
+    this.collisionSystem = new CollisionSystem(this); // Add collision system
     this.leaderboardSystem = new LeaderboardSystem(this);
     
     // Initialize map manager with configuration
@@ -57,6 +57,12 @@ export class NormalGameRoom extends BaseRoom {
     console.log("Generating initial dungeon floor...");
     const initialMap = this.mapManager.generateFirstFloor();
     console.log(`Initial floor generated with ${initialMap.layers.tiles.length}x${initialMap.layers.tiles[0].length} tiles`);
+    
+    // Initialize collision map with the generated map
+    this.collisionSystem.initCollisionMap(initialMap);
+    
+    // Connect systems
+    this.inputHandler.setCollisionSystem(this.collisionSystem);
     
     // Set initial phase
     this.phaseManager.setPhase("lobby");
