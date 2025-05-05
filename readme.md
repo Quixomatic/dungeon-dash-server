@@ -64,53 +64,65 @@ Dungeon Dash Royale is a unique blend of roguelike and battle royale mechanics w
 ```
 dungeon-dash-royale/
 ├── client/                      # Phaser game client
-│   ├── package.json
-│   ├── index.html
-│   ├── vite.config.js
-│   ├── public/                 # Static assets
-│   │   └── assets/
+│   ├── package.json             # Client dependencies and scripts
+│   ├── index.html               # Main HTML entry point
+│   ├── vite.config.js           # Vite bundler configuration
+│   ├── public/                  # Static assets
+│   │   └── assets/              # Game assets (sprites, sounds, etc.)
 │   └── src/
-│       ├── main.js             # Entry point
-│       ├── managers/           # Game component managers
-│       │   ├── PlayerManager.js   # Handles player creation and updates
-│       │   ├── NetworkHandler.js  # Handles network communication
-│       │   ├── InputHandler.js    # Handles player input
-│       │   ├── UIManager.js       # Manages UI elements
-│       │   ├── DebugManager.js    # Debug visualization
-│       │   └── DungeonRenderer.js # Renders the dungeon map
-│       ├── scenes/             # Phaser scenes
-│       │   ├── LobbyScene.js   # Matchmaking lobby
-│       │   ├── GameScene.js    # Main gameplay
-│       │   └── ResultsScene.js # End of game
-│       ├── systems/            # Game systems
-│       │   ├── GameState.js    # Global game state
-│       │   └── NetworkManager.js # Network communication
-│       └── utils/              # Utility functions
-│           ├── controls.js     # Input handling
-│           └── debug.js        # Debug helpers
-├── server/                     # Colyseus multiplayer server
-│   ├── package.json
-│   ├── index.js                # Server entry point
-│   ├── rooms/                  # Game room definitions
-│   │   ├── BaseRoom.js         # Base room class
-│   │   └── NormalGameRoom.js   # Standard game mode
-│   ├── schemas/                # Colyseus state schemas
-│   │   ├── PlayerState.js
-│   │   ├── StatsSchema.js      # Player stats schema
-│   │   ├── GameRoomState.js
-│   │   ├── Position.js
-│   │   ├── Item.js
-│   │   ├── DungeonSchema.js    # Compact dungeon representation
-│   │   └── Ability.js
-│   └── systems/                # Server-side game logic
-│       ├── InputHandler.js     # Processes player inputs
-│       ├── PhaseManager.js     # Manages game phases
-│       ├── EventManager.js     # Handles global events
-│       ├── CollisionSystem.js  # Collision detection
-│       ├── LeaderboardSystem.js # Player rankings
-│       ├── MapManager.js       # Manages dungeon maps
-│       ├── BSPDungeonGenerator.js # Generates dungeons using BSP
-│       └── RoomTemplates.js    # Room templates for dungeon generation
+│       ├── main.js              # Entry point for game code
+│       ├── managers/            # Game component managers
+│       │   ├── PlayerManager.js       # Handles player creation and updates
+│       │   ├── NetworkHandler.js      # Handles network communication
+│       │   ├── InputHandler.js        # Handles player input
+│       │   ├── UIManager.js           # Manages UI elements
+│       │   ├── DebugManager.js        # Debug visualization
+│       │   ├── ReconciliationManager.js # Handles server reconciliation
+│       │   ├── NetworkHandler.js      # Network message handling
+│       │   └── DungeonRenderer.js     # Renders the dungeon map
+│       ├── scenes/              # Phaser scenes
+│       │   ├── LobbyScene.js    # Matchmaking lobby
+│       │   ├── GameScene.js     # Main gameplay
+│       │   └── ResultsScene.js  # End of game
+│       ├── systems/             # Game systems
+│       │   ├── GameState.js     # Global game state manager
+│       │   └── NetworkManager.js # Network connection manager
+│       ├── data/                # Game data
+│       │   └── DungeonTemplates.js # Client-side dungeon templates
+│       └── utils/               # Utility functions
+│           ├── controls.js      # Input handling utilities
+│           └── debug.js         # Debug helper functions
+├── server/                      # Colyseus multiplayer server
+│   ├── package.json             # Server dependencies and scripts
+│   ├── index.js                 # Server entry point
+│   ├── rooms/                   # Game room definitions
+│   │   ├── BaseRoom.js          # Base room class with common functionality
+│   │   └── NormalGameRoom.js    # Standard game mode implementation
+│   ├── schemas/                 # Colyseus state schemas
+│   │   ├── PlayerState.js       # Player state definition
+│   │   ├── StatsSchema.js       # Player stats schema
+│   │   ├── GameRoomState.js     # Overall game room state
+│   │   ├── Position.js          # Position schema
+│   │   ├── Item.js              # Item schema
+│   │   ├── DungeonSchema.js     # Compact dungeon representation
+│   │   └── Ability.js           # Player ability schema
+│   ├── systems/                 # Server-side game logic
+│   │   ├── InputHandler.js      # Processes player inputs
+│   │   ├── PhaseManager.js      # Manages game phases
+│   │   ├── EventManager.js      # Handles global events
+│   │   ├── CollisionSystem.js   # Collision detection
+│   │   ├── LeaderboardSystem.js # Player rankings
+│   │   ├── MapManager.js        # Manages dungeon maps
+│   │   └── RoomTemplates.js     # Room templates for generation
+│   ├── utils/                   # Utility functions
+│   │   └── playerInputUtils.js  # Player input processing utilities
+│   └── dungeonGenerator/        # Dungeon generation system
+│       ├── index.js             # Main export file
+│       ├── dungeon.js           # Core generation algorithm
+│       ├── types.js             # Type definitions
+│       ├── utils.js             # Generation utilities
+│       ├── roomTemplates.js     # Room template definitions
+│       └── spawnRoomGenerator.js # Spawn room placement logic
 ```
 
 ## 🔄 Current Progress
