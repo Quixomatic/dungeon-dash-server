@@ -198,10 +198,12 @@ export class InputHandler {
       if (processedInput && processedInput.seq !== undefined) {
         const client = this.room.clients.find((c) => c.id === clientId);
         if (client) {
+          // Add a collided flag to the input ack
           client.send("inputAck", {
             seq: processedInput.seq,
             x: player.position.x,
             y: player.position.y,
+            collided: processedInput.collided, // Add collision flag
           });
 
           // Update the highest processed sequence
@@ -215,11 +217,7 @@ export class InputHandler {
     if (!inputQueue || inputQueue.length === 0) return null;
 
     let lastProcessedInput = null;
-
-    this.debug &&
-      console.log(
-        `Processing ${inputQueue.length} inputs for player ${clientId}`
-      );
+    let hasCollided = false; // Track if any collision occurred
 
     // Process each input
     for (const input of inputQueue) {
@@ -233,12 +231,14 @@ export class InputHandler {
       if (input.left) targetX -= moveAmount;
       if (input.right) targetX += moveAmount;
       if (input.up) targetY -= moveAmount;
-      if (input.down) targetY -= moveAmount;
+      if (input.down) targetY += moveAmount; // FIXED: Changed from -= to +=
 
       // Apply collision detection if system is available
       if (this.collisionSystem) {
         // Check and resolve collisions
         if (this.collisionSystem.checkCollision(targetX, targetY)) {
+          hasCollided = true; // Mark that a collision occurred
+
           const resolvedPosition = this.collisionSystem.resolveCollision(
             player.position.x,
             player.position.y,
@@ -267,6 +267,10 @@ export class InputHandler {
     if (lastProcessedInput) {
       player.lastMoveTime = Date.now();
 
+      // Add collision flag to the last processed input
+      lastProcessedInput.collided = hasCollided;
+
+      // Broadcast the movement to other clients
       this.room.broadcast(
         "playerMoved",
         {

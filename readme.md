@@ -135,6 +135,7 @@ dungeon-dash-royale/
 - [x] Smooth interpolation for other players
 - [x] Centralized GameState management for cross-scene state
 - [x] Tile-based dungeon generation using Binary Space Partitioning
+- [x] Functional collision detection system with client-server synchronization
 
 ### Server Features
 - [x] Room creation and management
@@ -151,6 +152,7 @@ dungeon-dash-royale/
 - [x] Expanded map size for more exploration
 - [x] Improved generator configuration parameters
 - [x] Spawn rooms in gutter zone (but not fully connected yet)
+- [x] Wall collision detection and response
 
 ### Client Features
 - [x] Lobby scene with connection UI
@@ -168,27 +170,46 @@ dungeon-dash-royale/
 - [x] Map loading synchronization
 - [x] Adaptive tile size handling
 - [x] Responsive UI design
+- [x] Circular collision detection for players vs walls
+
+### Deployment Features
+- [x] Docker container setup for both client and server
+- [x] Docker Compose configuration for easy deployment
 
 ## 🚀 Next Steps
 
 ### Immediate Priorities
-1. **Fix Spawn Room Connections**
+1. **Enhance Collision System**
+   - Implement more collision points around the player (16+ points instead of 8)
+   - Add intermediate collision checks to prevent corner sticking
+   - Implement diagonal sliding for smoother wall navigation
+   - Add center point collision detection for narrow passages
+   - Adjust collision resolution for improved corner handling
+
+2. **Improve Player Movement**
+   - Refine sliding along walls for smoother navigation
+   - Implement acceleration/deceleration for more natural movement
+   - Add visual feedback for collisions (subtle screen shake, particles)
+   - Improve handling of diagonal movement
+   - Fix movement in tight spaces and corners
+
+3. **Fix Spawn Room Connections**
    - Fix the current issue with spawn room corridors not properly connecting to the main dungeon
    - Create reliable paths from spawn rooms to the nearest dungeon room
    - Ensure corridors are properly carved into the tile map
 
-2. **Improve Minimap Functionality**
+4. **Improve Minimap Functionality**
    - Fix positioning offset in the minimap container
    - Implement minimap zoom to show less of the map for better navigation
    - Add minimap panning that follows player movement
    - Consider adding a "fog of war" effect to only show explored areas
 
-3. **Enhance Dungeon Generation**
+5. **Enhance Dungeon Generation**
    - Continue refining room templates
    - Add more environmental obstacles
    - Add collectibles and items
 
-4. **Create Item and Ability System**
+6. **Create Item and Ability System**
    - Define item types and effects
    - Implement player inventory
    - Create ability activation logic
@@ -255,6 +276,52 @@ We've implemented a centralized GameState system that acts as a single source of
    - GameState updates reflect current server state
    - Smooth interpolation for other players
 
+### Collision System
+
+We've successfully implemented a working collision system for the game:
+
+1. **Circular Collision Detection**
+   - Uses multiple points around the player to form a circular collision shape
+   - Currently uses 8 points (4 cardinal directions and 4 diagonals)
+   - Prevents players from walking through walls
+   - Works in both client prediction and server validation
+
+2. **Client-Server Collision Integration**
+   - Client predicts movement with collision
+   - Server validates movement with identical collision logic
+   - Reconciliation properly respects collisions
+   - Player stops at walls instead of clipping through them
+
+3. **Wall Sliding**
+   - Basic implementation of sliding along walls when colliding
+   - Allows player to move along a wall when hitting it at an angle
+   - Future improvements planned for better corner handling
+
+4. **Planned Enhancements**
+   - Adding more points for a smoother collision shape
+   - Implementing better corner handling
+   - Adding diagonal sliding
+   - Improving narrow passage navigation
+
+### Docker Deployment
+
+The game can now be easily run and deployed using Docker:
+
+1. **Docker Compose Setup**
+   - Orchestrates both client and server containers
+   - Sets up networking between containers
+   - Handles port forwarding
+
+2. **Container Configuration**
+   - Server container running Colyseus
+   - Client container running Vite dev server
+   - Volume mounting for development mode
+
+3. **Development Features**
+   - Hot reloading for both client and server code
+   - Consistent environment across different development machines
+   - Easy startup with a single command
+
 ## 💻 Development Notes
 
 ### Tile-Based Dungeon Generation
@@ -290,9 +357,13 @@ We've implemented a centralized GameState system that acts as a single source of
 - Access map data: `gameState.getMapData()`
 
 ### Recent Improvements
+- Implemented functional collision detection that prevents players from walking through walls
+- Fixed server-side collision update method error
+- Added collision points for better detection accuracy
 - Fixed rendering culling system to properly show all room and corridor tiles
 - Enhanced the visual representation of walls with textures based on their connection types
 - Doubled dungeon size for more exploration space
+- Added Docker containers for easier deployment
 - Improved generator configuration for better room layout and wider corridors
 - Added spawn rooms in gutter zone, still need to fix their connections to the main dungeon
 - Enhanced wall rendering based on wall connection patterns
@@ -301,8 +372,12 @@ We've implemented a centralized GameState system that acts as a single source of
 - Spawn room corridors are not being properly computed and carved into the map
 - Minimap container is positioned correctly, but its content appears offset
 - Minimap should be zoomed in more and pan with player movement
+- Players can get stuck on wall corners due to limited collision points
+- Movement in tight spaces needs improvement
 
 ## 🔧 Developer Setup
+
+### Standard Setup
 
 1. Clone the repository
 2. Install dependencies:
@@ -319,6 +394,19 @@ We've implemented a centralized GameState system that acts as a single source of
    cd client && npm run dev
    ```
 5. Open browser to `http://localhost:5173`
+
+### Docker Setup
+
+1. Make sure Docker and Docker Compose are installed
+2. From the root directory, run:
+   ```
+   docker-compose up
+   ```
+3. Access the game at `http://localhost:5173`
+4. To stop the containers:
+   ```
+   docker-compose down
+   ```
 
 ## 📚 Key Resources
 

@@ -158,4 +158,12 @@ export class CollisionSystem {
     input.resolvedY = targetY;
     return true;
   }
+
+  update(deltaTime) {
+    // This method can be empty for now or contain logic 
+    // that needs to run every frame for collision processing
+    
+    // For example, it could update dynamic collision objects if needed
+    // but for now an empty implementation will fix the immediate error
+  }
 }
