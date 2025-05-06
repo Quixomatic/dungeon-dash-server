@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User account for authentication
+model User {
+  id            Int             @id @default(autoincrement())
+  email         String?         @unique
+  password      String?         // Hashed password for email auth
+  username      String?         @unique
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  authProviders AuthProvider[]
+  playerProfile PlayerProfile?
+}
+
+// Authentication providers for federated login
+model AuthProvider {
+  id           Int      @id @default(autoincrement())
+  provider     String   // e.g., 'email', 'google', 'discord'
+  providerId   String
+  providerData Json?
+  lastLogin    DateTime @default(now())
+
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+}
+
+// Player game profile
+model PlayerProfile {
+  id               Int                 @id @default(autoincrement())
+  displayName      String
+  level            Int                 @default(1)
+  experiencePoints Int                 @default(0)
+  currencyGold     Int                 @default(0)
+  currencyGems     Int                 @default(0)
+  preferences      Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  userId           Int                 @unique
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  playerStats      PlayerStats?
+  inventoryItems   InventoryItem[]
+  achievements     PlayerAchievement[]
+}
+
+// Player statistics
+model PlayerStats {
+  id            Int           @id @default(autoincrement())
+  gamesPlayed   Int           @default(0)
+  gamesWon      Int           @default(0)
+  killCount     Int           @default(0)
+  deathCount    Int           @default(0)
+  highScore     Int           @default(0)
+  playTime      Int           @default(0)
+  statData      Json?
+
+  profileId     Int           @unique
+  playerProfile PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+// Player inventory items
+model InventoryItem {
+  id            Int           @id @default(autoincrement())
+  itemType      String
+  itemId        String
+  quantity      Int           @default(1)
+  equipped      Boolean       @default(false)
+  properties    Json?
+
+  profileId     Int
+  playerProfile PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+// Player achievements
+model PlayerAchievement {
+  id            Int           @id @default(autoincrement())
+  achievementId String
+  unlockedAt    DateTime?
+  progress      Float         @default(0)
+
+  profileId     Int
+  playerProfile PlayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, achievementId])
+}
