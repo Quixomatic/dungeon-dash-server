@@ -8,6 +8,7 @@
         "dev": "node --watch index.js"
     },
     "dependencies": {
+        "@colyseus/auth": "^0.16.6",
         "@colyseus/monitor": "^0.16.7",
         "@colyseus/schema": "^3.0.35",
         "@prisma/client": "^6.7.0",

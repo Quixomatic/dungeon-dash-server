@@ -9,6 +9,7 @@ export class PlayerState extends Schema {
   constructor() {
     super();
     this.id = "";
+    this.userId = ""; // Add user ID for persistence
     this.name = "";
     this.ready = false;
     this.position = new Position();
@@ -37,6 +38,7 @@ export class PlayerState extends Schema {
 
 defineTypes(PlayerState, {
   id: "string",
+  userId: "string", // Define the type
   name: "string",
   ready: "boolean",
   position: Position,
