@@ -9,6 +9,8 @@ import { EventManager } from "../systems/EventManager.js";
 import { CollisionSystem } from "../systems/CollisionSystem.js";
 import { LeaderboardSystem } from "../systems/LeaderboardSystem.js";
 import { MapManager } from "../systems/MapManager.js";
+import { auth } from "@colyseus/auth";
+import { prisma } from '../lib/prisma.js';
 
 export class NormalGameRoom extends BaseRoom {
   state = new GameRoomState();
@@ -351,7 +353,12 @@ export class NormalGameRoom extends BaseRoom {
     });
   }
 
-  // Save player data to database
+  /**
+   * Save player data to database on leave
+   * @param {string} userId - User ID
+   * @param {PlayerState} player - Player state
+   * @returns {Promise<void>}
+   */
   async savePlayerData(userId, player) {
     try {
       // Only save if userId is a valid numeric string
@@ -367,10 +374,16 @@ export class NormalGameRoom extends BaseRoom {
           playerStats: {
             update: {
               gamesPlayed: { increment: 1 },
-              // Add other stats you want to update
               playTime: {
                 increment: Math.floor((Date.now() - player.joinTime) / 1000),
               },
+              // Update other stats as needed
+              killCount: player.stats?.killCount || 0,
+              deathCount: player.stats?.deathCount || 0,
+              highScore: Math.max(
+                player.stats?.highScore || 0,
+                player.currentProgress || 0
+              ),
             },
           },
         },

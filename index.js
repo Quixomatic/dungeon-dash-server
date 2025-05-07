@@ -4,6 +4,7 @@ import http from 'http';
 import { Server } from 'colyseus';
 import { monitor } from '@colyseus/monitor';
 import { auth } from '@colyseus/auth';
+import cors from 'cors'; // Add this import
 import { NormalGameRoom } from './rooms/NormalGameRoom.js';
 import { prisma } from './lib/prisma.js';
 import authRoutes from './auth/routes.js';
@@ -11,6 +12,11 @@ import basicAuthPackage from 'express-basic-auth';
 
 const port = process.env.PORT || 2567;
 const app = express();
+
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], // Add your client URLs
+  credentials: true
+}));
 
 // JSON parsing middleware
 app.use(express.json());
