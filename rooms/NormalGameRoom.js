@@ -78,24 +78,70 @@ export class NormalGameRoom extends BaseRoom {
     console.log(`Room created: ${this.roomId} with options:`, roomOptions);
   }
 
-  onJoin(client, options) {
+  /**
+   * Static authentication method - validates the player's authentication token
+   * This gets called before a client joins the room
+   *
+   * @param {string} token - The JWT token to validate
+   * @param {Object} request - The HTTP request object
+   * @returns {Object} - The authenticated user data or throws an error
+   */
+  static async onAuth(token, request) {
+    // If token is provided, verify it
+    if (token) {
+      try {
+        // Verify token using auth module's JWT helper
+        const userData = await auth.JWT.verify(token);
+
+        console.log(
+          `User authenticated: ${userData.username || userData.email}`
+        );
+
+        // Return user data which will be available as client.auth in the room
+        return userData;
+      } catch (error) {
+        // Token verification failed
+        console.error("Authentication failed:", error.message);
+        throw new Error("Invalid authentication token");
+      }
+    }
+
+    // Allow guest access - no token provided
+    console.log("Guest connection (no token)");
+    return {
+      isGuest: true,
+      guestId: Math.random().toString(36).substring(2, 15),
+    };
+  }
+
+  /**
+   * Handle player joining the room
+   * This gets called after onAuth succeeds
+   * @param {Client} client - Colyseus client
+   * @param {Object} options - Join options from client
+   * @param {Object} auth - Authentication data from onAuth
+   */
+  onJoin(client, options, auth) {
     super.onJoin(client, options);
 
     // Get authenticated user information
-    const userId = client.auth?.userId;
+    const userId = auth && !auth.isGuest ? auth.id : null;
 
     // Create player state
     const player = new PlayerState();
     player.id = client.id;
 
     // If authenticated, use their profile data
-    if (userId && client.auth?.userData) {
-      const userData = client.auth.userData;
+    if (userId && auth) {
       player.name =
-        userData.playerProfile?.displayName ||
-        userData.username ||
+        auth.username ||
+        auth.playerProfile?.displayName ||
+        auth.email?.split("@")[0] ||
         `Player_${client.id.substr(0, 6)}`;
       player.userId = String(userId); // Store user ID for persistence
+      console.log(
+        `Authenticated player ${player.name} (User ID: ${userId}) joined`
+      );
     } else {
       // For guests or non-authenticated users
       player.name = options.name || `Guest_${client.id.substr(0, 6)}`;
@@ -117,8 +163,8 @@ export class NormalGameRoom extends BaseRoom {
     // Add player to room state
     this.state.players.set(client.id, player);
     console.log(
-      `Player ${player.name} (User ID: ${
-        userId || "anonymous"
+      `Player ${player.name} (${
+        userId ? "Authenticated" : "Guest"
       }) joined at position (${player.position.x}, ${player.position.y})`
     );
 
@@ -131,6 +177,7 @@ export class NormalGameRoom extends BaseRoom {
         x: player.position.x,
         y: player.position.y,
       },
+      authenticated: !!userId,
     });
 
     // Send map data to new player
@@ -150,6 +197,7 @@ export class NormalGameRoom extends BaseRoom {
         name: player.name,
         position: { x: player.position.x, y: player.position.y },
         playerCount: this.state.players.size,
+        authenticated: !!userId,
       },
       { except: client }
     );
