@@ -8,6 +8,11 @@ export class InputHandler {
     this.debug = false; // Enable debug logging for input processing
     this.playerProcessedSequences = new Map(); // Map of player ID to highest processed sequence
     this.collisionSystem = null; // Reference to collision system
+
+    // Dash configuration
+    this.dashDistance = 120;
+    this.dashDuration = 0.15; // seconds
+    this.dashCooldown = 3.0; // seconds
   }
 
   /**
@@ -87,11 +92,17 @@ export class InputHandler {
       }
     });
 
-    // Handle single input (original handler)
+    // Handle single input
     this.room.onMessage("playerInput", (client, message) => {
       // Get player
       const player = this.room.state.players.get(client.id);
       if (!player) return;
+
+      // Check if this is a dash input
+      if (message.type === "dash") {
+        this.handleDashInput(client, message);
+        return;
+      }
 
       // Initialize tracking if not exists
       if (!this.playerInputQueues.has(client.id)) {
@@ -152,6 +163,200 @@ export class InputHandler {
     });
   }
 
+  /**
+   * Handle dash input from client
+   * @param {Client} client - Colyseus client
+   * @param {Object} message - Dash input message
+   */
+  handleDashInput(client, message) {
+    // Get player
+    const player = this.room.state.players.get(client.id);
+    if (!player) return;
+
+    // Initialize dash charges if they don't exist
+    if (!player.dashCharges) {
+      player.dashCharges = [
+        { available: true, cooldownEndTime: 0 },
+        { available: true, cooldownEndTime: 0 },
+      ];
+    }
+
+    // Check if dash charge is available
+    if (!this.playerHasDashCharge(player)) {
+      // Send charge update to client
+      client.send("dashUpdate", {
+        charges: player.dashCharges,
+        seq: message.seq,
+      });
+      return;
+    }
+
+    // Normalize direction vector
+    const direction = message.direction;
+    const magnitude = Math.sqrt(
+      direction.x * direction.x + direction.y * direction.y
+    );
+    if (magnitude > 0) {
+      direction.x /= magnitude;
+      direction.y /= magnitude;
+    }
+
+    // Calculate dash movement
+    const startPos = {
+      x: player.position.x,
+      y: player.position.y,
+    };
+
+    // Calculate the full dash target position
+    const fullDashTarget = {
+      x: startPos.x + direction.x * this.dashDistance,
+      y: startPos.y + direction.y * this.dashDistance,
+    };
+
+    // Find furthest valid position
+    let finalPos = { ...fullDashTarget };
+    let hitWall = false;
+
+    if (this.collisionSystem) {
+      // Check points along the dash path
+      const steps = 10; // Number of points to check
+      for (let i = 1; i <= steps; i++) {
+        // Calculate position at this step
+        const progress = i / steps;
+        const checkX = startPos.x + direction.x * this.dashDistance * progress;
+        const checkY = startPos.y + direction.y * this.dashDistance * progress;
+
+        // Check collision at this position
+        if (this.collisionSystem.checkCollision(checkX, checkY)) {
+          hitWall = true;
+
+          // Use the previous valid position
+          const prevProgress = (i - 1) / steps;
+          finalPos = {
+            x: startPos.x + direction.x * this.dashDistance * prevProgress,
+            y: startPos.y + direction.y * this.dashDistance * prevProgress,
+          };
+
+          break;
+        }
+      }
+    }
+
+    // Consume dash charge
+    this.consumeDashCharge(player);
+
+    // Update player position
+    player.position.x = finalPos.x;
+    player.position.y = finalPos.y;
+
+    // Broadcast dash to other clients with start and end positions for smooth visualization
+    this.room.broadcast(
+      "playerDashed",
+      {
+        id: client.id,
+        startX: startPos.x,
+        startY: startPos.y,
+        endX: finalPos.x,
+        endY: finalPos.y,
+        direction: direction,
+        hitWall: hitWall,
+        seq: message.seq, // Include input sequence number for ordering!
+      },
+      { except: client }
+    );
+
+    // Send acknowledgment to client
+    client.send("inputAck", {
+      seq: message.seq,
+      x: finalPos.x,
+      y: finalPos.y,
+      dashCharges: player.dashCharges,
+      hitWall: hitWall,
+    });
+
+    // Update processed sequence
+    this.playerProcessedSequences.set(client.id, message.seq);
+  }
+
+  /**
+   * Check if player has a dash charge
+   * @param {Object} player - Player state object
+   * @returns {boolean} - True if player has available dash charge
+   */
+  playerHasDashCharge(player) {
+    if (!player.dashCharges) return false;
+
+    // Check all charges to see if any are available
+    for (let i = 0; i < player.dashCharges.length; i++) {
+      if (player.dashCharges[i].available) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Consume a dash charge and start cooldown
+   * @param {Object} player - Player state object
+   */
+  consumeDashCharge(player) {
+    if (!player.dashCharges) return;
+
+    // Find the first available charge
+    for (let i = 0; i < player.dashCharges.length; i++) {
+      if (player.dashCharges[i].available) {
+        player.dashCharges[i].available = false;
+        player.dashCharges[i].cooldownEndTime =
+          Date.now() + this.dashCooldown * 1000;
+
+        // Set timeout to restore this specific charge
+        this.startChargeCooldown(player, i);
+
+        // Exit after consuming one charge
+        break;
+      }
+    }
+  }
+
+  /**
+   * Start cooldown for a specific charge
+   * @param {Object} player - Player state object
+   * @param {number} chargeIndex - Index of the charge
+   */
+  startChargeCooldown(player, chargeIndex) {
+    // Store the player ID and charge index to handle player disconnection
+    const playerId = player.id;
+
+    setTimeout(() => {
+      // Check if player still exists in the room
+      if (!this.room.state.players.has(playerId)) return;
+
+      // Get the current player reference (might have changed)
+      const currentPlayer = this.room.state.players.get(playerId);
+
+      // Check if charge index is valid
+      if (
+        !currentPlayer.dashCharges ||
+        chargeIndex >= currentPlayer.dashCharges.length
+      )
+        return;
+
+      // Restore the charge
+      currentPlayer.dashCharges[chargeIndex].available = true;
+      currentPlayer.dashCharges[chargeIndex].cooldownEndTime = 0;
+
+      // Notify player about restored charge
+      const client = this.room.clients.find((c) => c.id === playerId);
+      if (client) {
+        client.send("dashChargeRestored", {
+          chargeIndex: chargeIndex,
+        });
+      }
+
+      console.log(`Restored dash charge ${chargeIndex} for player ${playerId}`);
+    }, this.dashCooldown * 1000);
+  }
+
   processAllInputs(deltaTime) {
     // Process inputs for each player
     for (const [clientId, inputQueue] of this.playerInputQueues.entries()) {
@@ -204,6 +409,7 @@ export class InputHandler {
             x: player.position.x,
             y: player.position.y,
             collided: processedInput.collided, // Add collision flag
+            dashCharges: player.dashCharges, // Include dash charges in ack
           });
 
           // Update the highest processed sequence
@@ -221,6 +427,9 @@ export class InputHandler {
 
     // Process each input
     for (const input of inputQueue) {
+      // Skip if this is a dash input (handled separately)
+      if (input.type === "dash") continue;
+
       // Calculate movement amount
       const moveAmount = (player.moveSpeed * (input.delta || deltaTime)) / 1000;
 

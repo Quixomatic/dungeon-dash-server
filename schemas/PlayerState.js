@@ -5,6 +5,19 @@ import { Item } from "./Item.js";
 import { Ability } from "./Ability.js";
 import { StatsSchema } from "./StatsSchema.js";
 
+// Create a simple schema for dash charges
+class DashCharge extends Schema {
+  constructor() {
+    super();
+    this.available = true;
+    this.cooldownEndTime = 0;
+  }
+}
+defineTypes(DashCharge, {
+  available: "boolean",
+  cooldownEndTime: "number"
+});
+
 export class PlayerState extends Schema {
   constructor() {
     super();
@@ -22,8 +35,15 @@ export class PlayerState extends Schema {
     this.joinTime = Date.now();
     this.lastMoveTime = 0;
     this.moveSpeed = 300; // Keep moveSpeed directly on PlayerState
-    this.gauntletId = null;
+    this.gauntletId = null; // We'll keep this property but not track it in the schema
     this.mapLoaded = false; // New flag for map loading status
+    
+    // Dash properties - use the proper DashCharge schema
+    this.dashCharges = new ArraySchema();
+    
+    // Initialize with one dash charge
+    this.dashCharges.push(new DashCharge());
+    this.dashCharges.push(new DashCharge());
 
     // These are not synchronized - server side only
     this._inputQueue = [];
@@ -38,7 +58,7 @@ export class PlayerState extends Schema {
 
 defineTypes(PlayerState, {
   id: "string",
-  userId: "string", // Define the type
+  userId: "string",
   name: "string",
   ready: "boolean",
   position: Position,
@@ -50,7 +70,8 @@ defineTypes(PlayerState, {
   completedObjectives: ["string"],
   joinTime: "number",
   lastMoveTime: "number",
-  moveSpeed: "number", // Keep directly on PlayerState
-  gauntletId: "string",
-  mapLoaded: "boolean", // Define the new property type
+  moveSpeed: "number",
+  mapLoaded: "boolean",
+  dashCharges: [DashCharge], // Use the DashCharge schema as the type
+  // gauntletId is removed from the schema but still exists as a property
 });

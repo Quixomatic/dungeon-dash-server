@@ -14,7 +14,7 @@ const port = process.env.PORT || 2567;
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], // Add your client URLs
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://173.79.120.221:5173'], // Add your client URLs
   credentials: true
 }));
 
