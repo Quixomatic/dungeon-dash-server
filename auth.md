@@ -19,7 +19,7 @@
 The authentication system for Dungeon Dash Royale will:
 - Allow players to register and login with email/password
 - Store user data securely using Prisma and PostgreSQL
-- Implement JWT-based authentication
+- Implement JWT-based authentication with both access and refresh tokens
 - Link player profiles with game progress and statistics
 - Provide a secure, persistent experience across sessions
 
@@ -67,18 +67,27 @@ The authentication system for Dungeon Dash Royale will:
   - Added profile data fetching and updating
   - Connected profile management with auth system
 
+- ✅ **Authentication Flow Fixes**
+  - Resolved token naming inconsistency issues
+  - Disabled conflicting Colyseus built-in auth routes
+  - Fixed password comparison issues with bcrypt
+  - Verified both access and refresh tokens are being generated and sent
+
 ## In Progress
 
 - 🔄 **Token Persistence & Session Management**
-  - Implement proper token refresh mechanism
-  - Fix session persistence across page reloads
-  - Add automatic token refresh for long-running sessions
-  - Improve token storage security
+  - ✅ Fix token format inconsistency between client/server
+  - ✅ Ensure both tokens (access + refresh) are being properly generated and returned
+  - 🔄 Implement proper token refresh mechanism
+  - 🔄 Fix session persistence across page reloads
+  - 🔄 Add automatic token refresh for long-running sessions
+  - 🔄 Improve token storage security
 
 - 🔄 **Testing and Debugging**
-  - Testing the end-to-end authentication flow
-  - Verifying token validation and user data connection
-  - Testing persistence of player data
+  - ✅ Fix password verification with bcrypt
+  - 🔄 Testing the end-to-end authentication flow
+  - 🔄 Verifying token validation and user data connection
+  - 🔄 Testing persistence of player data
 
 ## Pending Tasks
 
@@ -105,6 +114,7 @@ We have implemented the following server-side components:
    - `loginUser`: Authenticates a user and returns tokens
    - `refreshToken`: Issues a new token pair
    - `validateToken`: Verifies token validity
+   - `generateTokens`: Creates proper access and refresh tokens
 
 2. **Room Authentication (`NormalGameRoom.js`)**
    - `onAuth`: Validates token and extracts user data
@@ -113,8 +123,9 @@ We have implemented the following server-side components:
    - `onLeave`: Saves player data when authenticated users leave
 
 3. **Server Configuration**
-   - CORS support for handling cross-origin requests
-   - JWT token management
+   - Removed conflicting Colyseus built-in auth routes
+   - Using only custom auth routes for consistent token handling
+   - JWT token management with proper access and refresh tokens
    - API routes for authentication
 
 ### Client-Side Implementation
@@ -160,18 +171,31 @@ Our Prisma schema includes:
 
 ## Session Persistence
 
-Currently, we store authentication tokens in localStorage, but we're facing an issue where users need to log in again after page reloads. This happens because:
+We've addressed several important issues in the authentication implementation:
 
-1. While the token is stored in localStorage, we need to properly restore the authentication state on page load
-2. We need to implement a token refresh mechanism to handle token expiration
-3. The Colyseus client needs to be initialized with the token before connecting
+1. **Token Naming Consistency**:
+   - Fixed the mismatch between what the server was sending (`token`) and what the client was expecting (`accessToken`)
+   - Made sure both `accessToken` and `refreshToken` are being correctly generated and sent
 
-To fix this, we need to:
+2. **Authentication Route Conflict**:
+   - Removed the conflicting Colyseus auth routes that were causing inconsistency
+   - Now exclusively using our custom auth routes
 
-1. Update the NetworkManager to check for existing tokens on initialization
-2. Add a token refresh mechanism that runs periodically
-3. Ensure tokens are properly restored and validated on page reloads
-4. Implement proper error handling for invalid or expired tokens
+3. **Password Verification**:
+   - Fixed issues with bcrypt password comparison
+   - Ensured password field in database has sufficient length for full bcrypt hashes
+
+To improve session persistence, we still need to:
+
+1. **Complete the Token Refresh Flow**:
+   - Implement proper token expiration checking
+   - Add automatic refresh when tokens are about to expire
+   - Handle refresh token rotation for security
+
+2. **Improve Authentication State Restoration**:
+   - Enhance token validation on page reload
+   - Add better error handling for invalid tokens
+   - Implement grace periods for token refreshing
 
 ### Planned Implementation for Session Persistence
 
@@ -189,42 +213,7 @@ constructor() {
   }, 60000); // Check every minute
 }
 
-// Check for existing auth token and restore state
-async checkExistingAuth() {
-  const token = localStorage.getItem("auth_token");
-  if (!token) return;
-  
-  try {
-    // Validate token
-    const response = await fetch(`${this.httpServerUrl}/auth/validate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-    });
-    
-    if (!response.ok) {
-      // Token is invalid, remove it
-      localStorage.removeItem("auth_token");
-      this.isAuthenticated = false;
-      return;
-    }
-    
-    // Token is valid, restore auth state
-    const data = await response.json();
-    
-    this.isAuthenticated = true;
-    this.userData = data.user;
-    
-    console.log("Authentication restored from saved token");
-  } catch (error) {
-    console.error("Error validating saved token:", error);
-    localStorage.removeItem("auth_token");
-  }
-}
-
-// Check if token needs refresh
+// Enhanced token refresh check
 async refreshTokenIfNeeded() {
   if (!this.isAuthenticated) return;
   
@@ -232,13 +221,13 @@ async refreshTokenIfNeeded() {
   if (!token) return;
   
   // Check if token is about to expire
-  // (We'd need to decode the JWT to check expiration)
   try {
     const tokenData = this.decodeToken(token);
     const now = Date.now() / 1000;
     
     // If token expires in less than 5 minutes, refresh it
     if (tokenData.exp && tokenData.exp - now < 300) {
+      console.log("Token expiring soon, refreshing...");
       await this.refreshToken();
     }
   } catch (error) {
@@ -246,7 +235,7 @@ async refreshTokenIfNeeded() {
   }
 }
 
-// Helper to decode JWT token
+// More robust token decoding
 decodeToken(token) {
   try {
     const base64Url = token.split('.')[1];
@@ -263,34 +252,6 @@ decodeToken(token) {
 }
 ```
 
-### Connection with Authentication Token
-
-To ensure the Colyseus client uses the authentication token:
-
-```javascript
-async connect(options = {}) {
-  try {
-    if (!this.client) {
-      this.client = new Client(this.serverUrl);
-    }
-
-    // Set token on client if available
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      this.client.auth.token = token;
-    }
-
-    // Join or create room
-    this.room = await this.client.joinOrCreate(this.roomType, options);
-    this.connected = true;
-    
-    // Rest of the method...
-  } catch (error) {
-    // Handle error...
-  }
-}
-```
-
 ## Testing Procedure
 
 To test the authentication implementation:
@@ -301,12 +262,14 @@ To test the authentication implementation:
    - Fill in username, email, and password
    - Submit the form
    - Verify successful login and UI update
+   - Check localStorage for both token types
 
 2. **Login Flow**
    - Open the game after logging out
    - Enter email and password
    - Submit the login form
    - Verify successful login and UI update
+   - Check localStorage for both token types
 
 3. **Session Persistence**
    - Login to the game
@@ -361,31 +324,25 @@ To test the authentication implementation:
 
 ### Common Issues
 
-1. **Session Persistence Issues**
-   - Token not being saved properly in localStorage
-   - Token not being restored on page reload
-   - Missing token refresh mechanism
-   - Token validation failures
+1. **Token Format Issues**
+   - Inconsistent property names between server and client
+   - Missing or invalid token format
+   - Token expiration not properly handled
 
-2. **CORS Errors**
-   - Make sure the server has CORS properly configured
-   - Add the correct client origins to the CORS configuration
-   - Enable credentials if using cookies
+2. **Auth System Conflicts**
+   - Multiple auth systems running simultaneously (Colyseus + custom)
+   - Inconsistent routing leading to unexpected endpoints
+   - Middleware conflicts affecting response format
 
-3. **URL Scheme Issues**
-   - Ensure you're using the correct URL scheme for different operations:
-   - WebSocket URL (`ws://`) for game connections
-   - HTTP URL (`http://`) for authentication API calls
+3. **Password Verification**
+   - bcrypt compare returning false despite correct credentials
+   - Database field length insufficient for full hash
+   - Hash format incompatibilities between systems
 
-4. **React-Phaser Integration Issues**
-   - Make sure JSX is properly enabled in your build configuration
-   - Use the modern React 18 API with createRoot() for rendering
-   - Set proper z-index and pointer-events CSS properties
-
-5. **Token Validation Issues**
-   - Check that tokens are properly stored in localStorage
-   - Verify token format and expiration
-   - Check for correct token transmission in requests
+4. **React-Phaser Integration**
+   - JSX configuration issues
+   - Component rendering problems
+   - Event propagation issues between React and Phaser
 
 ### Debugging Authentication
 
@@ -403,9 +360,9 @@ When debugging authentication issues:
 
 Our immediate next steps are:
 
-1. Implement token refresh mechanism
-2. Fix session persistence across page reloads
+1. Complete token refresh mechanism implementation
+2. Enhance session persistence across page reloads
 3. Add automatic token refresh for long-running sessions
-4. Complete thorough testing of the auth flow
-5. Add security enhancements
+4. Test the complete authentication flow end-to-end
+5. Add security enhancements like rate limiting
 6. Implement more advanced profile features

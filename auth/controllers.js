@@ -1,6 +1,7 @@
 // auth/controllers.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { auth } from '@colyseus/auth';
 import { prisma } from "../lib/prisma.js";
 import { validateEmail, validatePassword } from "../lib/validators.js";
 
@@ -177,6 +178,48 @@ export async function refreshToken(req, res) {
   } catch (error) {
     console.error("Token refresh error:", error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function refreshTokenController(req, res) {
+  const { refreshToken } = req.body;
+  
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Refresh token required' });
+  }
+  
+  try {
+    // Verify the refresh token (with a different secret and longer expiry)
+    const decoded = jwt.verify(
+      refreshToken, 
+      process.env.REFRESH_TOKEN_SECRET || 'refresh-token-secret'
+    );
+    
+    // Get the user
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub || decoded.id },
+      include: { playerProfile: true }
+    });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+    
+    // Generate a new access token
+    const accessToken = auth.JWT.sign({
+      id: user.id,
+      email: user.email,
+      username: user.username
+    });
+    
+    // Return the new access token
+    return res.status(200).json({
+      token: accessToken, // Colyseus expects 'token'
+      expiresIn: auth.settings.jwt.expiresIn
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(401).json({ error: 'Invalid refresh token' });
   }
 }
 

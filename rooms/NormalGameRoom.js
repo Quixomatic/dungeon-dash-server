@@ -10,7 +10,8 @@ import { CollisionSystem } from "../systems/CollisionSystem.js";
 import { LeaderboardSystem } from "../systems/LeaderboardSystem.js";
 import { MapManager } from "../systems/MapManager.js";
 import { auth } from "@colyseus/auth";
-import { prisma } from '../lib/prisma.js';
+import jwt from "jsonwebtoken";
+import { prisma } from "../lib/prisma.js";
 
 export class NormalGameRoom extends BaseRoom {
   state = new GameRoomState();
@@ -93,7 +94,11 @@ export class NormalGameRoom extends BaseRoom {
     if (token) {
       try {
         // Verify token using auth module's JWT helper
-        const userData = await auth.JWT.verify(token);
+        //const userData = await auth.JWT.verify(token);
+        const userData = jwt.verify(
+          token,
+          process.env.JWT_SECRET || "your-jwt-secret-for-development"
+        );
 
         console.log(
           `User authenticated: ${userData.username || userData.email}`
