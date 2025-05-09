@@ -437,7 +437,7 @@ function carveProps(node, props) {
  * @param {Array} props - Props layer
  * @returns {Array} - Updated props layer with torches
  */
-function carveTorches(tiles, props) {
+export function carveTorches(tiles, props) {
   let result = duplicateTilemap(props);
 
   for (let y = 0; y < result.length; y++) {
