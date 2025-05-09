@@ -1,4 +1,47 @@
+import { monsterRoomTemplates } from "./monsterRoomTemplates.js";
+
+const spawnRoomTemplate = {
+  id: "spawn_room",
+  type: "spawn",
+  width: 7,
+  height: 7,
+  layers: {
+    // Floor tiles with walls around the edge
+    tiles: [
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+    ],
+    // Props layer with a spawn marker in the center (21 = spawn marker/ladder)
+    props: [
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 12, 0, 12, 0, 0], // Torches in corners
+      [0, 12, 0, 0, 0, 12, 0],
+      [0, 0, 0, 21, 0, 0, 0], // Spawn point in center (21 = ladder/spawn marker)
+      [0, 12, 0, 0, 0, 12, 0],
+      [0, 0, 12, 0, 12, 0, 0], // Torches in corners
+      [0, 0, 0, 0, 0, 0, 0],
+    ],
+    // No monsters in spawn rooms
+    monsters: [
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+    ],
+  },
+};
+
 export default [
+  ...monsterRoomTemplates,
+  spawnRoomTemplate,
   {
     id: "10x10",
     width: 10,

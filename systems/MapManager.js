@@ -136,7 +136,7 @@ export class MapManager {
       rooms: roomTemplates,
       mapWidth: dungeonSize,
       mapHeight: dungeonSize,
-      mapGutterWidth: 10,
+      mapGutterWidth: 20,
       iterations: 6,//Math.max(3, Math.min(6, Math.floor(dungeonSize / 20))),
       containerSplitRetries: 30,
       containerMinimumRatio: 0.45,
@@ -158,8 +158,8 @@ export class MapManager {
     // Add spawn rooms around the dungeon
     const spawnRoomConfig = {
       playerCount,
-      bufferDistance: 8,
-      spawnRoomSize: 6,
+      bufferDistance: 5,
+      spawnRoomSize: 5,
       templates: roomTemplates,
       gutterWidth: generatorConfig.mapGutterWidth // Pass the gutter width
     };
