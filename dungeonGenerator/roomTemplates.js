@@ -1,40 +1,34 @@
 import { monsterRoomTemplates } from "./monsterRoomTemplates.js";
 
 const spawnRoomTemplate = {
-  id: "spawn_room",
+  id: "default_spawn_room",
   type: "spawn",
-  width: 7,
-  height: 7,
+  width: 5,
+  height: 5,
   layers: {
-    // Floor tiles with walls around the edge
+    // Hardcoded 5x5 tiles array (1 for walls, 0 for floor)
     tiles: [
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0], // Top wall
+      [0, 0, 0, 0, 0], // Floor with side walls
+      [0, 0, 0, 0, 0], // Floor with side walls
+      [0, 0, 0, 0, 0], // Floor with side walls
+      [0, 0, 0, 0, 0], // Bottom wall
     ],
-    // Props layer with a spawn marker in the center (21 = spawn marker/ladder)
+    // Empty props array (all zeros)
     props: [
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 12, 0, 12, 0, 0], // Torches in corners
-      [0, 12, 0, 0, 0, 12, 0],
-      [0, 0, 0, 21, 0, 0, 0], // Spawn point in center (21 = ladder/spawn marker)
-      [0, 12, 0, 0, 0, 12, 0],
-      [0, 0, 12, 0, 12, 0, 0], // Torches in corners
-      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0], // Will add spawn marker separately
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
     ],
-    // No monsters in spawn rooms
+    // Empty monsters array (all zeros)
     monsters: [
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0],
     ],
   },
 };

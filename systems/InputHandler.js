@@ -465,8 +465,8 @@ export class InputHandler {
       player.position.y = targetY;
 
       // Apply boundary constraints
-      player.position.x = Math.max(0, Math.min(player.position.x, 20000));
-      player.position.y = Math.max(0, Math.min(player.position.y, 20000));
+      player.position.x = Math.max(0, Math.min(player.position.x, 32768));
+      player.position.y = Math.max(0, Math.min(player.position.y, 32768));
 
       // Keep track of last processed input
       lastProcessedInput = input;
